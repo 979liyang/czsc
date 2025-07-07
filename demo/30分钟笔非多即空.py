@@ -125,19 +125,20 @@ class Strategy(czsc.CzscStrategyBase):
     def positions(self):
         pos_list = [
             # create_long_short_V230908(self.symbol),
-            create_long_short_V230909(self.symbol, base_freq='30分钟'),
-            create_long_short_V230909(self.symbol, base_freq='60分钟'),
+            # create_long_short_V230909(self.symbol, base_freq='30分钟'),
+            # create_long_short_V230909(self.symbol, base_freq='60分钟'),
             create_long_short_V230909(self.symbol, base_freq='日线'),
         ]
         return pos_list
 
 
 if __name__ == '__main__':
-    results_path = Path(r'res:\30分钟笔笔非多即空')
+    results_path = Path(r'res/30分钟笔笔非多即空')
     results_path.mkdir(exist_ok=True, parents=True)
     logger.add(results_path / "czsc.log", rotation="1 week", encoding="utf-8")
 
-    symbols = research.get_symbols('中证500成分股')[:30]
+    symbols = research.get_symbols('all')[:30]
+    # symbols = research.get_symbols('中证500成分股')[:30]
     symbol = symbols[0]
     tactic = Strategy(symbol=symbol, is_stocks=True)
 

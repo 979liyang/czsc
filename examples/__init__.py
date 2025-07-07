@@ -17,6 +17,6 @@ pd.set_option('display.max_columns', 20)
 
 
 # data_path 是 TS_CACHE 缓存数据文件夹所在目录
-dc = TsDataCache(data_path=r"C:\ts_data_czsc", refresh=False, sdt="20120101", edt="20221001")
+dc = TsDataCache(data_path=r"/Users/liyang/Desktop/czsc/.cache/ts_data_czsc", refresh=False, sdt="20120101", edt="20221001")
 
 

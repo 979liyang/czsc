@@ -110,3 +110,8 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+.cache/
+.env
+.cursor/
+res/
