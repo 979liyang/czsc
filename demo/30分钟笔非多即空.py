@@ -137,8 +137,8 @@ if __name__ == '__main__':
     results_path.mkdir(exist_ok=True, parents=True)
     logger.add(results_path / "czsc.log", rotation="1 week", encoding="utf-8")
 
-    symbols = research.get_symbols('all')[:30]
-    # symbols = research.get_symbols('中证500成分股')[:30]
+    # symbols = research.get_symbols('all')[:30]
+    symbols = research.get_symbols('中证500成分股')[:30]
     symbol = symbols[0]
     tactic = Strategy(symbol=symbol, is_stocks=True)
 

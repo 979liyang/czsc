@@ -108,6 +108,22 @@ class FX:
 
     @property
     def power_str(self):
+        """分型的力度强度描述
+
+        函数执行逻辑：
+
+        1. 确保分型由3根K线构成
+        2. 对于底分型（Mark.D）：
+           - 如果第三根K线的收盘价高于第一根K线的最高价，力度为"强"
+           - 如果第三根K线的收盘价高于第二根K线的最高价，力度为"中"
+           - 否则力度为"弱"
+        3. 对于顶分型（Mark.G）：
+           - 如果第三根K线的收盘价低于第一根K线的最低价，力度为"强"
+           - 如果第三根K线的收盘价低于第二根K线的最低价，力度为"中"
+           - 否则力度为"弱"
+
+        :return: 力度强度字符串，可选值："强"、"中"、"弱"
+        """
         assert len(self.elements) == 3
         k1, k2, k3 = self.elements
 
@@ -208,10 +224,12 @@ class BI:
     cache: dict = field(default_factory=dict)  # cache 用户缓存
 
     def __post_init__(self):
+        """初始化笔的开始时间和结束时间"""
         self.sdt = self.fx_a.dt
         self.edt = self.fx_b.dt
 
     def __repr__(self):
+        """返回笔对象的字符串表示"""
         return (
             f"BI(symbol={self.symbol}, sdt={self.sdt}, edt={self.edt}, "
             f"direction={self.direction}, high={self.high}, low={self.low})"
@@ -273,10 +291,18 @@ class BI:
 
     @property
     def low(self):
+        """笔的最低点
+
+        :return: 笔的起始分型和结束分型中的最低价
+        """
         return min(self.fx_a.low, self.fx_b.low)
 
     @property
     def power(self):
+        """笔的力度（价差力度）
+
+        :return: 笔的价差力度，等于power_price
+        """
         return self.power_price
 
     @property
@@ -373,6 +399,7 @@ class ZS:
     cache: dict = field(default_factory=dict)  # cache 用户缓存
 
     def __post_init__(self):
+        """初始化中枢的标的代码"""
         self.symbol = self.bis[0].symbol
 
     @property
@@ -440,6 +467,7 @@ class ZS:
         return True
 
     def __repr__(self):
+        """返回中枢对象的字符串表示"""
         return (
             f"ZS(sdt={self.sdt}, sdir={self.sdir}, edt={self.edt}, edir={self.edir}, "
             f"len_bis={len(self.bis)}, zg={self.zg}, zd={self.zd}, "
@@ -467,6 +495,14 @@ class Signal:
     # 任意 出现在模板信号中可以指代任何值
 
     def __post_init__(self):
+        """初始化信号对象
+
+        函数执行逻辑：
+
+        1. 如果signal为空，根据k1、k2、k3、v1、v2、v3、score组合生成signal字符串
+        2. 如果signal不为空，从signal字符串中解析出k1、k2、k3、v1、v2、v3、score
+        3. 验证score是否在0~100之间，如果不在范围内则抛出异常
+        """
         if not self.signal:
             self.signal = f"{self.k1}_{self.k2}_{self.k3}_{self.v1}_{self.v2}_{self.v3}_{self.score}"
         else:
@@ -485,6 +521,7 @@ class Signal:
             raise ValueError("score 必须在0~100之间")
 
     def __repr__(self):
+        """返回信号对象的字符串表示"""
         return f"Signal('{self.signal}')"
 
     @property
@@ -545,6 +582,16 @@ class Factor:
     name: str = ""
 
     def __post_init__(self):
+        """初始化因子对象
+
+        函数执行逻辑：
+
+        1. 验证signals_all不能为空，如果为空则抛出异常
+        2. 将因子对象转换为字典，移除name字段
+        3. 对因子字典进行SHA256哈希计算，取前4位作为唯一标识
+        4. 如果name不为空，将name和哈希值组合；如果name为空，只使用哈希值
+        5. 最终name格式为：原name#哈希值 或 #哈希值
+        """
         if not self.signals_all:
             raise ValueError("signals_all 不能为空")
         _fatcor = self.dump()
@@ -646,6 +693,17 @@ class Event:
     name: str = ""
 
     def __post_init__(self):
+        """初始化事件对象
+
+        函数执行逻辑：
+
+        1. 验证factors不能为空，如果为空则抛出异常
+        2. 将事件对象转换为字典，移除name字段
+        3. 对事件字典进行SHA256哈希计算，取前4位作为唯一标识
+        4. 如果name不为空，将name和哈希值组合；如果name为空，使用操作类型和哈希值组合
+        5. 最终name格式为：原name#哈希值 或 操作类型#哈希值
+        6. 保存哈希值到sha256属性中
+        """
         if not self.factors:
             raise ValueError("factors 不能为空")
         _event = self.dump()
@@ -835,6 +893,7 @@ class Position:
         self.end_dt = None  # 最近一次信号传入的时间
 
     def __repr__(self):
+        """返回持仓对象的字符串表示"""
         return (
             f"Position(name={self.name}, symbol={self.symbol}, opens={[x.name for x in self.opens]}, "
             f"timeout={self.timeout}, stop_loss={self.stop_loss}BP, T0={self.T0}, interval={self.interval}s)"

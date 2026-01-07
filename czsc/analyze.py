@@ -140,8 +140,18 @@ def check_fxs(bars: List[NewBar]) -> List[FX]:
 def check_bi(bars: List[NewBar], **kwargs):
     """输入一串无包含关系K线，查找其中的一笔
 
+    函数执行逻辑：
+
+    1. 首先从无包含关系K线中查找所有分型
+    2. 如果分型数量少于2个，返回None和原始K线列表
+    3. 根据第一个分型的类型（顶分型或底分型）确定笔的方向
+    4. 查找与第一个分型方向相反且满足条件的分型作为笔的结束点
+    5. 判断两个分型之间是否存在包含关系，如果存在则不能成笔
+    6. 判断笔的长度是否满足最小笔长度要求
+    7. 如果满足成笔条件，创建BI对象并返回，同时返回剩余的K线；否则返回None和原始K线列表
+
     :param bars: 无包含关系K线列表
-    :return:
+    :return: (BI对象或None, 剩余K线列表)
     """
     min_bi_len = envs.get_min_bi_len()
     fxs = check_fxs(bars)
@@ -208,9 +218,21 @@ class CZSC:
             self.update(bar)
 
     def __repr__(self):
+        """返回对象的字符串表示"""
         return "<CZSC~{}~{}>".format(self.symbol, self.freq.value)
 
     def __update_bi(self):
+        """更新笔的识别结果
+
+        函数执行逻辑：
+
+        1. 如果未完成笔的K线数量少于3根，无法识别分型，直接返回
+        2. 如果是第一笔，需要找到第一个有效的分型作为起点，然后查找成笔
+        3. 如果不是第一笔，直接查找成笔
+        4. 检查当前笔是否被破坏（向上笔被新高破坏，向下笔被新低破坏）
+        5. 如果笔被破坏，将当前笔的K线与未完成笔的K线合并，重新识别
+        6. 更新笔列表和未完成笔的K线列表
+        """
         bars_ubi = self.bars_ubi
         if len(bars_ubi) < 3:
             return
@@ -361,7 +383,17 @@ class CZSC:
 
     @property
     def last_bi_extend(self):
-        """判断最后一笔是否在延伸中，True 表示延伸中"""
+        """判断最后一笔是否在延伸中
+
+        函数执行逻辑：
+
+        1. 如果笔列表为空，返回False
+        2. 如果最后一笔是向上笔，检查未完成笔的K线中是否有新高超过最后一笔的高点
+        3. 如果最后一笔是向下笔，检查未完成笔的K线中是否有新低低于最后一笔的低点
+        4. 如果满足延伸条件，返回True；否则返回False
+
+        :return: True 表示最后一笔正在延伸中，False 表示未延伸
+        """
         if self.bi_list[-1].direction == Direction.Up \
                 and max([x.high for x in self.bars_ubi]) > self.bi_list[-1].high:
             return True
@@ -391,7 +423,17 @@ class CZSC:
 
     @property
     def ubi(self):
-        """Unfinished Bi，未完成的笔"""
+        """Unfinished Bi，未完成的笔
+
+        函数执行逻辑：
+
+        1. 如果未完成笔的K线列表为空、笔列表为空或未完成笔中没有分型，返回None
+        2. 获取未完成笔中所有原始K线，找到最高点和最低点
+        3. 根据最后一笔的方向，确定未完成笔的方向（与最后一笔相反）
+        4. 构建未完成笔的字典，包含方向、高低点、K线、分型等信息
+
+        :return: 未完成笔的字典对象，包含方向、高低点、K线等信息；如果无法构建则返回None
+        """
         ubi_fxs = self.ubi_fxs
         if not self.bars_ubi or not self.bi_list or not ubi_fxs:
             return None
