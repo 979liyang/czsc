@@ -4,15 +4,41 @@ author: zengbin93
 email: zeng_bin8888@163.com
 create_dt: 2019/10/29 15:01
 """
-from rs_czsc import (
-    daily_performance,
-    top_drawdowns,
-    # python版本：from czsc.traders.weight_backtest import WeightBacktest
-    WeightBacktest,
-)
+# 可选导入 rs_czsc 模块（如果未安装则使用本地实现）
+try:
+    from rs_czsc import (
+        daily_performance,
+        top_drawdowns,
+        # python版本：from czsc.traders.weight_backtest import WeightBacktest
+        WeightBacktest,
+    )
+except ImportError:
+    # 如果 rs_czsc 未安装，使用本地实现或设置为 None
+    import warnings
+    warnings.warn("rs_czsc 模块未安装，某些功能可能不可用。建议安装: pip install rs_czsc>=0.1.6")
+    
+    # 尝试从本地模块导入替代实现
+    try:
+        from czsc.utils.stats import daily_performance, top_drawdowns
+    except ImportError:
+        daily_performance = None
+        top_drawdowns = None
+    
+    try:
+        from czsc.traders.weight_backtest import WeightBacktest
+    except ImportError:
+        WeightBacktest = None
 
 from czsc import envs
-from czsc import fsa
+
+# 可选导入 fsa 模块（飞书相关功能，需要 tenacity 等依赖）
+try:
+    from czsc import fsa
+except ImportError as e:
+    import warnings
+    warnings.warn(f"无法导入 czsc.fsa 模块: {e}。飞书相关功能将不可用。如需使用，请安装依赖: pip install tenacity")
+    fsa = None
+
 from czsc import utils
 from czsc import traders
 from czsc import sensors
