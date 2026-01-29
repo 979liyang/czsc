@@ -117,3 +117,37 @@ venv.bak/
 res/
 tushare-demo/
 CZSC投研数据
+
+# Project specific
+data/klines/
+data/metadata/
+data/cache/
+data/exports/
+logs/
+*.log
+.env
+.env.local
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Backend
+backend/__pycache__/
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/.venv/
+backend/venv/
+backend/*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
