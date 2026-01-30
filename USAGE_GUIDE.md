@@ -371,32 +371,6 @@ print(dir(signals))
 
 #### 自定义信号函数
 
-```python
-from czsc.objects import Signal
-from czsc.analyze import CZSC
-
-def my_signal(czsc: CZSC, **kwargs) -> dict:
-    """自定义信号函数
-    
-    :param czsc: CZSC分析对象
-    :param kwargs: 其他参数
-    :return: 信号字典
-    """
-    s = {}
-    
-    # 获取最后一笔
-    if czsc.finished_bis:
-        last_bi = czsc.finished_bis[-1]
-        
-        # 判断笔的方向
-        if last_bi.direction.value == "向上":
-            s[f"{czsc.freq.value}_自定义信号_向上"] = "向上"
-        else:
-            s[f"{czsc.freq.value}_自定义信号_向下"] = "向下"
-    
-    return s
-```
-
 ### 3. 完整策略示例
 
 ```python

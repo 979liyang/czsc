@@ -1,17 +1,19 @@
-# `CZSC` 类是缠论分析的核心类，负责分型和笔的识别。
-# # 属性
-# czsc.bars_raw          # 原始K线列表
-# czsc.bars_ubi          # 未完成笔的K线列表
-# czsc.fx_list           # 分型列表
-# czsc.finished_bis      # 已完成的笔列表
-# czsc.bi_list           # 所有笔列表（包括未完成）
-# czsc.ubi               # 未完成的笔
-# czsc.last_bi_extend    # 最后一笔是否在延伸
+"""
+`CZSC` 类是缠论分析的核心类，负责分型和笔的识别。
+# 属性
+czsc.bars_raw          # 原始K线列表
+czsc.bars_ubi          # 未完成笔的K线列表
+czsc.fx_list           # 分型列表
+czsc.finished_bis      # 已完成的笔列表
+czsc.bi_list           # 所有笔列表（包括未完成）
+czsc.ubi               # 未完成的笔
+czsc.last_bi_extend    # 最后一笔是否在延伸
 
-# # 方法
-# czsc.update(bar)       # 更新新的K线
-# czsc.to_echarts()      # 生成ECharts图表
-# czsc.open_in_browser() # 在浏览器中打开图表
+# 方法
+czsc.update(bar)       # 更新新的K线
+czsc.to_echarts()      # 生成ECharts图表
+czsc.open_in_browser() # 在浏览器中打开图表
+"""
 
 from czsc.analyze import CZSC
 from czsc.objects import Freq
