@@ -302,20 +302,31 @@ def get_symbols(step="all"):
 def get_raw_bars(symbol, freq, sdt, edt, fq="后复权", raw_bar=True):
     """读取本地数据"""
     ts_code, asset = symbol.split("#")
-    freq = str(freq)
+    # 保存原始的 freq 值（用于 format_kline）
+    if isinstance(freq, Freq):
+        original_freq = freq
+        freq_str = str(freq.value)
+    else:
+        original_freq = Freq(freq)
+        freq_str = str(freq)
+    
     adj = "qfq" if fq == "前复权" else "hfq"
 
-    if "分钟" in freq:
-        freq = freq.replace("分钟", "min")
-        bars = pro_bar_minutes(ts_code, sdt=sdt, edt=edt, freq=freq, asset=asset, adj=adj)
+    if "分钟" in freq_str:
+        # 分钟线：将 "30分钟" 转换为 "30min" 用于 tushare API
+        freq_ts = freq_str.replace("分钟", "min")
+        bars = pro_bar_minutes(ts_code, sdt=sdt, edt=edt, freq=freq_ts, asset=asset, adj=adj)
         if raw_bar:
-            bars = format_kline(bars, Freq(freq))
+            # 使用原始的 Freq 枚举对象（如 Freq.F30）
+            bars = format_kline(bars, original_freq)
 
     else:
+        # 日线/周线/月线：将 "日线" 转换为 "D" 用于 tushare API
         import tushare as ts
         _map = {"日线": "D", "周线": "W", "月线": "M"}
-        freq = _map[freq]
-        bars = ts.pro_bar(ts_code, start_date=sdt, end_date=edt, freq=freq, asset=asset, adj=adj)
+        freq_ts = _map[freq_str]  # 用于 tushare API 的频率
+        bars = ts.pro_bar(ts_code, start_date=sdt, end_date=edt, freq=freq_ts, asset=asset, adj=adj)
         if raw_bar:
-            bars = format_kline(bars, Freq(freq))
+            # 使用原始的 Freq 枚举对象（如 Freq.D）
+            bars = format_kline(bars, original_freq)
     return bars
