@@ -1,50 +1,4 @@
-# CZSC 缠中说禅技术分析工具 - 完整使用指南
 
-## 目录
-
-1. [项目概述](#项目概述)
-2. [核心概念](#核心概念)
-3. [安装与配置](#安装与配置)
-4. [快速开始](#快速开始)
-5. [核心模块详解](#核心模块详解)
-6. [数据连接器](#数据连接器)
-7. [策略开发](#策略开发)
-8. [回测与优化](#回测与优化)
-9. [实战案例](#实战案例)
-10. [最佳实践](#最佳实践)
-11. [常见问题](#常见问题)
-
----
-
-## 项目概述
-
-### 什么是 CZSC？
-
-CZSC（缠中说禅）是一个基于缠论技术分析理论的 Python 量化交易工具库。它实现了缠论中的核心概念，包括：
-
-- **分型识别**：自动识别顶分型和底分型
-- **笔识别**：基于分型自动识别笔
-- **中枢识别**：识别价格震荡区间
-- **多级别联立分析**：支持多个时间周期的联合分析
-- **信号系统**：基于缠论结构生成交易信号
-- **策略回测**：完整的策略回测框架
-
-### 项目特点
-
-- ✅ 完整的缠论技术分析实现
-- ✅ 支持多数据源（Tushare、聚宽、米筐、QMT等）
-- ✅ 灵活的信号和策略系统
-- ✅ 丰富的可视化工具
-- ✅ 完善的回测框架
-- ✅ 活跃的社区支持
-
-### 版本信息
-
-- 当前版本：0.9.69
-- Python 要求：>= 3.8
-- 主要依赖：pandas, numpy, loguru, plotly 等
-
----
 
 ## 核心概念
 
@@ -120,216 +74,27 @@ Freq.M     # 月线
 from czsc.enum import Operate, Direction
 
 # 操作类型
-Operate.LO   # 开多
-Operate.LC   # 平多
-Operate.SO   # 开空
-Operate.SE   # 平空
-Operate.HO   # 持多
-Operate.HS   # 持空
+Operate.LO   # 开多 买入（先买开仓，看涨）
+Operate.LC   # 平多 卖出（卖出平仓，了结多头）
+Operate.SO   # 开空 卖出（先卖开仓，看跌）
+Operate.SE   # 平空 买入（买入平仓，了结空头）
+Operate.HO   # 持多 持有（已持有买入的多头仓位）
+Operate.HS   # 持空 持有（已持有卖出的空头仓位）
+
+开多 = 买，开空 = 卖（开仓方向决定多空）
+平多 = 卖，平空 = 买（平仓是与开仓相反的操作）
+持多/持空 = 持有仓位，不新开不平仓
 
 # 方向
 Direction.Up     # 向上
 Direction.Down   # 向下
 ```
 
----
-
-## 安装与配置
-
-### 1. 安装 CZSC
-
-#### 从 GitHub 安装（推荐）
-```bash
-pip install git+https://github.com/waditu/czsc.git -U
-```
-
-#### 从 PyPI 安装
-```bash
-pip install czsc -U -i https://pypi.python.org/simple
-```
-
-#### 从本地源码安装
-```bash
-git clone https://github.com/waditu/czsc.git
-cd czsc
-pip install -e .
-```
-
-### 2. 安装依赖
-
-主要依赖已包含在 requirements.txt 中，安装时会自动安装。如需手动安装：
-
-```bash
-pip install -r requirements.txt
-```
-
-### 3. 环境配置
-
-#### 日志配置
-CZSC 使用 `loguru` 进行日志记录，默认会输出到控制台。可以通过环境变量配置：
-
-```python
-import os
-os.environ['CZSC_LOG_LEVEL'] = 'INFO'  # DEBUG, INFO, WARNING, ERROR
-```
-
-#### 缓存配置
-CZSC 使用本地缓存存储数据，默认路径在用户主目录下的 `.czsc` 文件夹：
-
-```python
-from czsc.utils import home_path
-print(home_path)  # 查看缓存路径
-
-# 清空缓存
-from czsc.utils import empty_cache_path
-empty_cache_path()
-```
-
-#### 数据源配置
-
-**Tushare 配置**：
-```python
-# 在 tushare_config.json 中配置
-{
-    "token": "your_tushare_token",
-    "pro_api": "https://api.tushare.pro"
-}
-```
-
-**其他数据源**：根据具体连接器文档配置相应的 API Key 或连接信息。
-
----
-
 ## 快速开始
 
-### 示例 1：基础缠论分析
-
-```python
-# -*- coding: utf-8 -*-
-from czsc.analyze import CZSC
-from czsc.objects import RawBar, Freq
-from czsc.connectors import research
-from datetime import datetime
-
-# 1. 获取K线数据
-symbol = "000001.SH"
-bars = research.get_raw_bars(
-    symbol=symbol,
-    freq=Freq.D,
-    sdt="20200101",
-    edt="20231231"
-)
-
-# 2. 创建CZSC分析对象
-czsc = CZSC(bars)
-
-# 3. 查看分析结果
-print(f"识别出 {len(czsc.finished_bis)} 笔")
-print(f"识别出 {len(czsc.fxs)} 个分型")
-
-# 4. 查看最后一笔
-if czsc.finished_bis:
-    last_bi = czsc.finished_bis[-1]
-    print(f"最后一笔方向：{last_bi.direction.value}")
-    print(f"最后一笔幅度：{last_bi.power:.2f}")
-
-# 5. 生成图表
-chart = czsc.to_echarts()
-czsc.open_in_browser()  # 在浏览器中打开
-```
-
-### 示例 2：多周期分析
-
-```python
-# -*- coding: utf-8 -*-
-from czsc.utils import BarGenerator
-from czsc.objects import RawBar, Freq
-from czsc.connectors import research
-
-# 1. 获取基础周期K线
-symbol = "000001.SH"
-bars = research.get_raw_bars(
-    symbol=symbol,
-    freq=Freq.F30,  # 30分钟作为基础周期
-    sdt="20230101",
-    edt="20231231"
-)
-
-# 2. 创建K线合成器
-bg = BarGenerator(base_freq=Freq.F30, freqs=[Freq.F30, Freq.F60, Freq.D])
-
-# 3. 更新K线
-for bar in bars:
-    bg.update(bar)
-
-# 4. 获取各周期K线
-bars_30m = bg.bars[Freq.F30]
-bars_60m = bg.bars[Freq.F60]
-bars_d = bg.bars[Freq.D]
-
-# 5. 对各周期进行分析
-from czsc.analyze import CZSC
-czsc_30m = CZSC(bars_30m)
-czsc_60m = CZSC(bars_60m)
-czsc_d = CZSC(bars_d)
-```
-
-### 示例 3：信号计算
-
-```python
-# -*- coding: utf-8 -*-
-from czsc.traders import CzscSignals
-from czsc.utils import BarGenerator
-from czsc.objects import Freq
-from czsc.connectors import research
-
-# 1. 获取K线数据
-symbol = "000001.SH"
-bars = research.get_raw_bars(
-    symbol=symbol,
-    freq=Freq.D,
-    sdt="20200101",
-    edt="20231231"
-)
-
-# 2. 创建K线合成器
-bg = BarGenerator(base_freq=Freq.D, freqs=[Freq.D, Freq.W])
-for bar in bars:
-    bg.update(bar)
-
-# 3. 配置信号
-signals_config = [
-    {
-        'name': 'czsc.signals.tas_ma_base_V221101',
-        'freq': '日线',
-        'di': 1,
-        'ma_type': 'SMA',
-        'timeperiod': 5
-    },
-    {
-        'name': 'czsc.signals.tas_ma_base_V221101',
-        'freq': '日线',
-        'di': 5,
-        'ma_type': 'SMA',
-        'timeperiod': 20
-    }
-]
-
-# 4. 创建信号计算对象
-cs = CzscSignals(bg=bg, signals_config=signals_config)
-
-# 5. 获取信号
-signals = cs.s
-print("所有信号：")
-for k, v in signals.items():
-    if isinstance(k, str) and len(k.split("_")) == 3:
-        print(f"{k}: {v}")
-
-# 6. 生成快照
-cs.take_snapshot("signals_snapshot.html")
-```
-
----
+### 示例 1：基础缠论分析 examples/analyze.py
+### 示例 2：多周期分析 examples/barGenerator.py
+### 示例 3：信号计算 examples/signals.py
 
 ## 核心模块详解
 
@@ -357,32 +122,6 @@ czsc.last_bi_extend    # 最后一笔是否在延伸
 czsc.update(bar)       # 更新新的K线
 czsc.to_echarts()      # 生成ECharts图表
 czsc.open_in_browser() # 在浏览器中打开图表
-```
-
-#### 使用示例
-
-```python
-from czsc.analyze import CZSC
-from czsc.objects import RawBar, Freq
-from czsc.connectors import research
-
-# 获取数据
-bars = research.get_raw_bars("000001.SH", Freq.D, "20200101", "20231231")
-
-# 创建分析对象
-czsc = CZSC(bars)
-
-# 实时更新
-new_bar = research.get_raw_bars("000001.SH", Freq.D, "20231231", "20240101")[-1]
-czsc.update(new_bar)
-
-# 查看结果
-print(f"分型数量：{len(czsc.fxs)}")
-print(f"笔数量：{len(czsc.finished_bis)}")
-
-# 可视化
-czsc.to_echarts()
-czsc.open_in_browser()
 ```
 
 ### 2. objects.py - 数据对象定义
@@ -558,31 +297,6 @@ CZSC 支持多种数据源，通过 `czsc.connectors` 模块访问。
 ### 1. research - 研究数据源
 
 最常用的数据连接器，支持多种数据获取方式。
-
-```python
-from czsc.connectors import research
-from czsc.objects import Freq
-
-# 获取股票列表
-symbols = research.get_symbols('中证500成分股')
-print(f"共 {len(symbols)} 只股票")
-
-# 获取K线数据
-bars = research.get_raw_bars(
-    symbol="000001.SH",
-    freq=Freq.D,
-    sdt="20200101",
-    edt="20231231"
-)
-
-# 获取多个标的的K线
-all_bars = research.get_raw_bars_multi(
-    symbols=["000001.SH", "000002.SH"],
-    freq=Freq.D,
-    sdt="20200101",
-    edt="20231231"
-)
-```
 
 ### 2. ts_connector - Tushare 数据源
 
@@ -1404,64 +1118,3 @@ with Pool(processes=4) as pool:
 ```
 
 ---
-
-## 参考资料
-
-### 官方资源
-
-- **GitHub**: https://github.com/waditu/czsc
-- **API文档**: https://czsc.readthedocs.io/en/latest/
-- **项目文档**: https://s0cqcxuy3p.feishu.cn/wiki/wikcn3gB1MKl3ClpLnboHM1QgKf
-- **信号函数规范**: https://s0cqcxuy3p.feishu.cn/wiki/wikcnCFLLTNGbr2THqo7KtWfBkd
-
-### 学习资源
-
-- **缠论原文**: http://www.fxgan.com
-- **B站视频教程**: https://space.bilibili.com/243682308/channel/series
-- **飞书交流群**: 通过README中的链接加入
-
-### 相关项目
-
-- **rs_czsc**: Rust版本的CZSC，性能更优
-- **Streamlit组件库**: 用于构建量化研究UI
-
----
-
-## 更新日志
-
-### 版本 0.9.69 (2025-06-24)
-
-- 当前稳定版本
-- 支持多数据源
-- 完善的信号系统
-- 丰富的可视化工具
-
----
-
-## 贡献指南
-
-欢迎贡献代码、报告问题或提出建议！
-
-1. Fork 项目
-2. 创建功能分支
-3. 提交更改
-4. 推送到分支
-5. 创建 Pull Request
-
----
-
-## 许可证
-
-本项目采用开源许可证，详见 LICENSE 文件。
-
----
-
-## 联系方式
-
-- **作者**: zengbin93
-- **邮箱**: zeng_bin8888@163.com
-- **微信**: zengbin93（备注：桌面应用开发）
-
----
-
-**祝您使用愉快！如有问题，欢迎在 GitHub Issues 中提出。**

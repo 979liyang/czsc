@@ -1,3 +1,33 @@
+## 项目概述
+
+### 什么是 CZSC？
+
+CZSC（缠中说禅）是一个基于缠论技术分析理论的 Python 量化交易工具库。它实现了缠论中的核心概念，包括：
+
+- **分型识别**：自动识别顶分型和底分型
+- **笔识别**：基于分型自动识别笔
+- **中枢识别**：识别价格震荡区间
+- **多级别联立分析**：支持多个时间周期的联合分析
+- **信号系统**：基于缠论结构生成交易信号
+- **策略回测**：完整的策略回测框架
+
+### 项目特点
+
+- ✅ 完整的缠论技术分析实现
+- ✅ 支持多数据源（Tushare、聚宽、米筐、QMT等）
+- ✅ 灵活的信号和策略系统
+- ✅ 丰富的可视化工具
+- ✅ 完善的回测框架
+- ✅ 活跃的社区支持
+
+### 版本信息
+
+- 当前版本：0.9.69
+- Python 要求：>= 3.8
+- 主要依赖：pandas, numpy, loguru, plotly 等
+
+---
+
 # czsc - 缠中说禅技术分析工具
 
 [![Downloads](https://static.pepy.tech/personalized-badge/czsc?period=total&units=international_system&left_color=red&right_color=orange&left_text=Downloads/Total)](https://pepy.tech/project/czsc)
