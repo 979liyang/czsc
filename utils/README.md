@@ -88,3 +88,20 @@ empty_cache_path()
 ## 前端使用
 
 https://github.com/tvjsx/trading-vue-js?tab=readme-ov-file
+
+### 指数
+symbols/SSE-000001/
+
+### 指标 
+
+- 收藏
+- 我的脚本
+
+### 技术指标
+
+#### 指标
+
+#### 策略
+
+### 形态
+
