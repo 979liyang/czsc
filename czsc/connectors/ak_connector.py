@@ -159,12 +159,12 @@ def _get_stock_daily(ak_code: str, start_date: str, end_date: str, adjust: str =
         # AKShare 股票日线数据接口
         df = ak.stock_zh_a_hist(
             symbol=ak_code,
-            period="日k",
+            period="daily",
             start_date=start_date.replace("-", ""),
             end_date=end_date.replace("-", ""),
             adjust=adjust
         )
-        
+
         if df.empty:
             return pd.DataFrame()
         

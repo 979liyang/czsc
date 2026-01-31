@@ -16,7 +16,7 @@ from pathlib import Path
 
 
 # 投研共享数据的本地缓存路径，需要根据实际情况修改
-cache_path = os.environ.get("czsc_research_cache", r"/Users/liyang/Desktop/npc-czsc/.cache/CZSC投研数据")
+cache_path = os.environ.get("czsc_research_cache", r"/Users/liyang/Desktop/npc-czsc/.stock_data/CZSC投研数据")
 if not os.path.exists(cache_path):
     raise ValueError(
         f"请设置环境变量 czsc_research_cache 为投研共享数据的本地缓存路径，当前路径不存在：{cache_path}。\n\n"
@@ -85,3 +85,16 @@ def get_raw_bars(symbol, freq, sdt, edt, fq="前复权", **kwargs):
 
     _bars = czsc.resample_bars(df, freq, raw_bars=raw_bars, base_freq="1分钟")
     return _bars
+
+
+def get_raw_bars_multi(symbols, freq, sdt, edt, fq="前复权", **kwargs):
+"""
+    :param symbols: 标的代码列表
+    :param freq: 周期
+    :param sdt: 开始时间
+    :param edt: 结束时间
+    :param fq: 除权类型
+    :param kwargs:
+    :return:
+    """
+    return [get_raw_bars(symbol, freq, sdt, edt, fq, **kwargs) for symbol in symbols]

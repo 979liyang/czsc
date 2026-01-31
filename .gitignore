@@ -155,3 +155,4 @@ Thumbs.db
 .results/
 .vscode/
 .vscode/*
+.stock_data/

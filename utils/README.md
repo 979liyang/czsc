@@ -77,3 +77,14 @@ empty_cache_path()
 ```
 
 **其他数据源**：根据具体连接器文档配置相应的 API Key 或连接信息。
+
+## 存储的数据格式
+
+```python
+      symbol                  dt         open        close         high          low        vol      amount
+0  000001.SH 2010-01-04 09:31:00  3292.049072  3293.325928  3295.279053  3292.049072  203927696  2358753536
+```
+
+## 前端使用
+
+https://github.com/tvjsx/trading-vue-js?tab=readme-ov-file
