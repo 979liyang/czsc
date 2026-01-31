@@ -11,25 +11,26 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,vue,js,jsx,json,css,scss,md}\""
   },
   "dependencies": {
-    "vue": "^3.3.4",
-    "vue-router": "^4.2.5",
-    "pinia": "^2.1.7",
-    "axios": "^1.6.0",
-    "element-plus": "^2.4.2",
     "@element-plus/icons-vue": "^2.3.1",
+    "axios": "^1.6.0",
     "echarts": "^5.4.3",
-    "vue-echarts": "^6.6.1"
+    "element-plus": "^2.4.2",
+    "pinia": "^2.1.7",
+    "trading-vue-js": "^1.0.2",
+    "vue": "^3.3.4",
+    "vue-echarts": "^6.6.1",
+    "vue-router": "^4.2.5"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.4.0",
     "@vue/eslint-config-typescript": "^12.0.0",
-    "typescript": "^5.2.2",
-    "vue-tsc": "^1.8.22",
-    "vite": "^4.5.0",
+    "autoprefixer": "^10.4.16",
     "eslint": "^8.52.0",
+    "postcss": "^8.4.31",
     "prettier": "^3.0.3",
     "tailwindcss": "^3.3.5",
-    "autoprefixer": "^10.4.16",
-    "postcss": "^8.4.31"
+    "typescript": "^5.2.2",
+    "vite": "^4.5.0",
+    "vue-tsc": "^1.8.22"
   }
 }

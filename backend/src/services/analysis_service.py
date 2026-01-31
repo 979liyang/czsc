@@ -54,6 +54,24 @@ class AnalysisService:
             'zss': [],  # 中枢需要单独计算，暂时返回空列表
         }
 
+        # 计算统计信息（类似 demo/analyze.py）
+        result['bars_raw_count'] = len(czsc.bars_raw)
+        result['bars_ubi_count'] = len(czsc.bars_ubi)
+        result['fx_count'] = len(czsc.fx_list)
+        result['finished_bi_count'] = len(czsc.finished_bis)
+        result['bi_count'] = len(czsc.bi_list)
+        result['ubi_count'] = len(czsc.ubi) if czsc.ubi else 0
+        result['last_bi_extend'] = czsc.last_bi_extend
+
+        # 提取最后一笔信息
+        if czsc.finished_bis:
+            last_bi = czsc.finished_bis[-1]
+            result['last_bi_direction'] = last_bi.direction.value
+            result['last_bi_power'] = last_bi.power
+        else:
+            result['last_bi_direction'] = None
+            result['last_bi_power'] = None
+
         logger.info(f"缠论分析完成：{symbol} {freq}，笔{len(result['bis'])}条，"
                    f"分型{len(result['fxs'])}个，中枢{len(result['zss'])}个")
 

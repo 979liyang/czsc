@@ -39,6 +39,16 @@ class AnalysisResponse(BaseModel):
     bis: List[Dict[str, Any]] = Field(..., description="BI序列化后的字典列表")
     fxs: List[Dict[str, Any]] = Field(..., description="FX序列化后的字典列表")
     zss: List[Dict[str, Any]] = Field(..., description="ZS序列化后的字典列表")
+    # 统计信息
+    bars_raw_count: int = Field(..., description="原始K线数量")
+    bars_ubi_count: int = Field(..., description="未完成笔的K线数量")
+    fx_count: int = Field(..., description="分型数量")
+    finished_bi_count: int = Field(..., description="已完成笔数量")
+    bi_count: int = Field(..., description="所有笔数量（包括未完成）")
+    ubi_count: int = Field(..., description="未完成笔数量")
+    last_bi_extend: bool = Field(..., description="最后一笔是否在延伸")
+    last_bi_direction: Optional[str] = Field(None, description="最后一笔方向")
+    last_bi_power: Optional[float] = Field(None, description="最后一笔幅度")
 
 
 class SignalRequest(BaseModel):

@@ -29,4 +29,9 @@ export const routes: RouteRecordRaw[] = [
     name: 'Backtest',
     component: () => import('../views/Backtest.vue'),
   },
+  {
+    path: '/stock/:symbol',
+    name: 'StockDetail',
+    component: () => import('../views/StockDetail.vue'),
+  },
 ];

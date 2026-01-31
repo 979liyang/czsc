@@ -1,7 +1,7 @@
 <template>
   <div class="fx-list">
-    <el-table :data="fxs" stripe style="width: 100%" max-height="400">
-      <el-table-column prop="dt" label="时间" width="150" />
+    <el-table :data="sortedFxs" stripe style="width: 100%" max-height="400">
+      <el-table-column prop="dt" label="时间" width="150" sortable />
       <el-table-column prop="mark" label="类型" width="100">
         <template #default="{ row }">
           <el-tag :type="row.mark === '顶分型' ? 'danger' : 'success'">
@@ -21,6 +21,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { ElTable, ElTableColumn, ElTag } from 'element-plus';
 import type { FX } from '../types';
 
@@ -28,7 +29,14 @@ interface Props {
   fxs: FX[];
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
+
+// 按时间排序（降序，最新的在前）
+const sortedFxs = computed(() => {
+  return [...props.fxs].sort((a, b) => {
+    return new Date(b.dt).getTime() - new Date(a.dt).getTime();
+  });
+});
 </script>
 
 <style scoped>

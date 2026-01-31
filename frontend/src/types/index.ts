@@ -64,4 +64,35 @@ export interface AnalysisResponse {
   bis: BI[];
   fxs: FX[];
   zss: ZS[];
+  // 统计信息
+  bars_raw_count?: number;
+  bars_ubi_count?: number;
+  fx_count?: number;
+  finished_bi_count?: number;
+  bi_count?: number;
+  ubi_count?: number;
+  last_bi_extend?: boolean;
+  last_bi_direction?: string;
+  last_bi_power?: number;
+}
+
+// TradingVue.js 相关类型定义
+export interface TradingVueData {
+  t: number; // 时间戳（毫秒）
+  o: number; // 开盘价
+  h: number; // 最高价
+  l: number; // 最低价
+  c: number; // 收盘价
+  v: number; // 成交量
+}
+
+export interface TradingVueOverlay {
+  name: string;
+  type: string;
+  data: Array<{
+    time: number;
+    price: number;
+    [key: string]: any;
+  }>;
+  settings?: Record<string, any>;
 }

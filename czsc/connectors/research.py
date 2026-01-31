@@ -88,7 +88,7 @@ def get_raw_bars(symbol, freq, sdt, edt, fq="前复权", **kwargs):
 
 
 def get_raw_bars_multi(symbols, freq, sdt, edt, fq="前复权", **kwargs):
-"""
+    """ 批量获取K线数据
     :param symbols: 标的代码列表
     :param freq: 周期
     :param sdt: 开始时间
