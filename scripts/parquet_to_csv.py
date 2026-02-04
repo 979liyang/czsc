@@ -2,7 +2,7 @@ import pandas as pd
 import os
 
 # 1. 定义文件路径（当前目录下的文件）
-parquet_file = "/Users/liyang/Desktop/npc-czsc/.stock_data/CZSC投研数据/A股主要指数/000001.SH.parquet"
+parquet_file = "/Users/liyang/Desktop/npc-czsc/.stock_data/raw/minute_by_stock/stock_code=600000.SH/year=2023/600000.SH_2023-08.parquet"
 csv_file = "/Users/liyang/Desktop/000001.SH.parquet.csv" 
 
 # 2. 检查文件是否存在

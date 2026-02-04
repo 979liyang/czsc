@@ -5,12 +5,24 @@ FastAPI应用入口
 配置CORS、中间件、日志系统等。
 """
 import os
+import sys
 from pathlib import Path
+
+# 确保可以导入 src 模块
+# 如果从项目根目录运行，需要添加 backend 目录到路径
+backend_dir = Path(__file__).parent.parent
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
+
+# 确保可以导入 czsc 模块（项目根目录的 czsc 目录）
+project_root = backend_dir.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
-import sys
 
 # 配置日志
 logger.remove()
@@ -103,4 +115,10 @@ app.include_router(data_management.router, prefix="/api/v1", tags=["数据管理
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # 直接运行 app 对象，而不是使用字符串路径
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8000,
+        reload=True
+    )

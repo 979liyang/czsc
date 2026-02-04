@@ -49,6 +49,15 @@ npm run dev
 
 访问 http://localhost:5173
 
+## 股票详情页（本地 .stock_data 数据）
+
+后端启动后，你可以直接打开股票详情页查看本地数据的 30/60/日线 CZSC 分析结果（TradingVue.js 展示）：
+
+- Demo（600078）：
+  - `http://localhost:5173/stock/600078.SH`
+
+页面默认起始日期为 **2018-01-01**，结束日期为今天，可在页面内调整时间范围。
+
 ## 构建
 
 ```bash

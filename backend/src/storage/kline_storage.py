@@ -6,7 +6,7 @@ K线数据存储服务
 """
 import json
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 import pandas as pd
 from loguru import logger

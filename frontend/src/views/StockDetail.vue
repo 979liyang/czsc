@@ -6,15 +6,6 @@
         <h2>{{ symbol }}</h2>
         <div class="header-actions">
           <el-form :inline="true" class="filter-form">
-            <el-form-item label="周期">
-              <el-select v-model="form.freq" style="width: 120px" @change="handleFreqChange">
-                <el-option label="日线" value="日线" />
-                <el-option label="30分钟" value="30分钟" />
-                <el-option label="60分钟" value="60分钟" />
-                <el-option label="周线" value="周线" />
-                <el-option label="月线" value="月线" />
-              </el-select>
-            </el-form-item>
             <el-form-item label="开始时间">
               <el-date-picker
                 v-model="form.sdt"
@@ -58,74 +49,139 @@
     </div>
 
     <!-- 主要内容 -->
-    <div v-if="!store.loading && !store.error && store.analysisData">
-      <!-- 图表区域 -->
-      <el-card class="chart-card">
-        <template #header>
-          <span>K线图表</span>
-        </template>
-        <KlineChartTradingVue
-          v-if="store.analysisData"
-          :data="store.analysisData"
-          :symbol="symbol"
-        />
-      </el-card>
+    <div v-if="!store.loading && !store.error && store.localCzsc">
+      <el-alert
+        v-if="itemsKeys.length === 0"
+        class="mb-4"
+        type="warning"
+        :closable="false"
+        title="当前时间范围内没有读取到本地数据"
+        description="请确认本地存在 .stock_data/raw/minute_by_stock 的 parquet；或尝试 demo：600078.SH；或将开始时间设为 20180101。"
+      />
 
-      <!-- 统计信息区域 -->
+      <!-- 统计信息区域（含周期切换） -->
       <el-card class="stats-card">
         <template #header>
           <span>分析统计</span>
         </template>
-        <div class="stats-grid">
+        <el-tabs v-model="store.activeFreq" class="mb-4">
+          <el-tab-pane
+            v-for="f in availableFreqs"
+            :key="f"
+            :label="f"
+            :name="f"
+          />
+        </el-tabs>
+
+        <el-card v-if="store.localCzsc?.meta" class="mb-4" shadow="never">
+          <template #header>
+            <span>数据元信息</span>
+          </template>
+          <div class="meta-grid">
+            <div class="meta-item">
+              <span class="meta-label">parquet 命中：</span>
+              <span class="meta-value">{{ store.localCzsc.meta.parquet_count }}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">行数（过滤前/后）：</span>
+              <span class="meta-value">
+                {{ store.localCzsc.meta.rows_before_filter }} / {{ store.localCzsc.meta.rows_after_filter }}
+              </span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">period 过滤：</span>
+              <span class="meta-value">{{ store.localCzsc.meta.period_filtered ? '是(仅1分钟)' : '否' }}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">dt 范围：</span>
+              <span class="meta-value">{{ store.localCzsc.meta.dt_min || '-' }} ~ {{ store.localCzsc.meta.dt_max || '-' }}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">base_freq：</span>
+              <span class="meta-value">{{ store.localCzsc.meta.base_freq }}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">输出周期：</span>
+              <span class="meta-value">{{ (store.localCzsc.meta.target_freqs || []).join(', ') || '-' }}</span>
+            </div>
+            <div class="meta-item meta-item-full">
+              <span class="meta-label">bars 数量：</span>
+              <span class="meta-value">{{ formatBarCounts(store.localCzsc.meta.generated_bar_counts) }}</span>
+            </div>
+            <div v-if="(store.localCzsc.meta.warnings || []).length" class="meta-item meta-item-full">
+              <span class="meta-label">warnings：</span>
+              <span class="meta-value">{{ (store.localCzsc.meta.warnings || []).join('；') }}</span>
+            </div>
+          </div>
+        </el-card>
+
+        <el-alert
+          v-if="itemsKeys.length > 0 && !activeItem"
+          type="warning"
+          :closable="false"
+          title="当前周期没有返回数据"
+          description="可尝试切换到其他分钟周期，或扩大时间范围（建议 sdt=20180101）。"
+          class="mb-4"
+        />
+
+        <div v-if="activeItem" class="stats-grid">
           <div class="stat-item">
             <span class="stat-label">原始K线数量：</span>
-            <span class="stat-value">{{ store.analysisData.bars_raw_count || 0 }}</span>
+            <span class="stat-value">{{ activeItem.stats?.bars_raw_count || 0 }}</span>
           </div>
           <div class="stat-item">
             <span class="stat-label">未完成笔的K线数量：</span>
-            <span class="stat-value">{{ store.analysisData.bars_ubi_count || 0 }}</span>
+            <span class="stat-value">{{ activeItem.stats?.bars_ubi_count || 0 }}</span>
           </div>
           <div class="stat-item">
             <span class="stat-label">分型数量：</span>
-            <span class="stat-value">{{ store.analysisData.fx_count || 0 }}</span>
+            <span class="stat-value">{{ activeItem.stats?.fx_count || 0 }}</span>
           </div>
           <div class="stat-item">
             <span class="stat-label">已完成笔数量：</span>
-            <span class="stat-value">{{ store.analysisData.finished_bi_count || 0 }}</span>
+            <span class="stat-value">{{ activeItem.stats?.finished_bi_count || 0 }}</span>
           </div>
           <div class="stat-item">
             <span class="stat-label">所有笔数量：</span>
-            <span class="stat-value">{{ store.analysisData.bi_count || 0 }}</span>
+            <span class="stat-value">{{ activeItem.stats?.bi_count || 0 }}</span>
           </div>
           <div class="stat-item">
             <span class="stat-label">未完成笔数量：</span>
-            <span class="stat-value">{{ store.analysisData.ubi_count || 0 }}</span>
+            <span class="stat-value">{{ activeItem.stats?.ubi_count || 0 }}</span>
           </div>
           <div class="stat-item">
             <span class="stat-label">最后一笔是否延伸：</span>
-            <span class="stat-value">{{ store.analysisData.last_bi_extend ? '是' : '否' }}</span>
+            <span class="stat-value">{{ activeItem.stats?.last_bi_extend ? '是' : '否' }}</span>
           </div>
           <div class="stat-item">
             <span class="stat-label">最后一笔方向：</span>
-            <span class="stat-value">{{ store.analysisData.last_bi_direction || '-' }}</span>
+            <span class="stat-value">{{ activeItem.stats?.last_bi_direction || '-' }}</span>
           </div>
           <div class="stat-item">
             <span class="stat-label">最后一笔幅度：</span>
             <span class="stat-value">
-              {{ store.analysisData.last_bi_power ? store.analysisData.last_bi_power.toFixed(2) : '-' }}
+              {{ activeItem.stats?.last_bi_power ? activeItem.stats.last_bi_power.toFixed(2) : '-' }}
             </span>
           </div>
         </div>
       </el-card>
 
+      <!-- 图表区域 -->
+      <el-card v-if="activeItem" class="chart-card">
+        <template #header>
+          <span>K线图表（{{ store.activeFreq }}）</span>
+        </template>
+        <KlineChartTradingVue :item="activeItem" :meta="store.localCzsc?.meta" />
+      </el-card>
+
       <!-- 分型和笔列表区域 -->
-      <el-row :gutter="20">
+      <el-row v-if="activeItem" :gutter="20">
         <el-col :span="12">
           <el-card class="list-card">
             <template #header>
               <span>分型列表</span>
             </template>
-            <FxList :fxs="store.analysisData.fxs || []" />
+            <FxList :fxs="activeItem.fxs || []" />
           </el-card>
         </el-col>
         <el-col :span="12">
@@ -133,7 +189,7 @@
             <template #header>
               <span>笔列表</span>
             </template>
-            <BiList :bis="store.analysisData.bis || []" />
+            <BiList :bis="activeItem.bis || []" />
           </el-card>
         </el-col>
       </el-row>
@@ -142,7 +198,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, computed, ref } from 'vue';
+import { onMounted, computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { Refresh } from '@element-plus/icons-vue';
 import { useStockDetailStore } from '../stores';
@@ -160,17 +216,18 @@ const symbol = computed(() => {
 
 // 表单数据
 const form = ref({
-  freq: '日线',
   sdt: '',
   edt: '',
 });
 
+const defaultFreqs = '1,5,15,30,60';
+const defaultBaseFreq = '1分钟';
+
 // 获取默认时间范围
 const getDefaultDateRange = () => {
   const today = new Date();
-  const oneYearAgo = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
-  const sdt = oneYearAgo.toISOString().split('T')[0];
   const edt = today.toISOString().split('T')[0];
+  const sdt = '2018-01-01';
   return { sdt, edt };
 };
 
@@ -186,19 +243,8 @@ const handleRefresh = () => {
   if (symbol.value && form.value.sdt && form.value.edt) {
     const sdt = form.value.sdt.replace(/-/g, '');
     const edt = form.value.edt.replace(/-/g, '');
-    
-    store.fetchAnalysis({
-      symbol: symbol.value,
-      freq: form.value.freq,
-      sdt,
-      edt,
-    });
+    store.fetchLocalCzsc(symbol.value, sdt, edt, defaultFreqs, defaultBaseFreq, true);
   }
-};
-
-// 周期变更
-const handleFreqChange = () => {
-  handleRefresh();
 };
 
 // 日期变更
@@ -206,6 +252,67 @@ const handleDateChange = () => {
   if (form.value.sdt && form.value.edt) {
     handleRefresh();
   }
+};
+
+const activeItem = computed(() => {
+  const data = store.localCzsc;
+  if (!data) return null;
+  return data.items?.[store.activeFreq] || null;
+});
+
+const itemsKeys = computed(() => {
+  const data = store.localCzsc;
+  return Object.keys(data?.items || {});
+});
+
+const availableFreqs = computed(() => {
+  const data = store.localCzsc;
+  const m = data?.meta;
+  if (m?.target_freqs && m.target_freqs.length) return m.target_freqs;
+  const keys = Object.keys(data?.items || {});
+  return keys.length ? keys : ['1分钟', '5分钟', '15分钟', '30分钟', '60分钟', '日线'];
+});
+
+watch(
+  () => [store.localCzsc, store.activeFreq],
+  () => {
+    const data = store.localCzsc;
+    if (!data) return;
+    if (itemsKeys.value.length === 0) {
+      console.warn('[StockDetail] local_czsc 返回 items 为空', {
+        symbol: symbol.value,
+        sdt: form.value.sdt,
+        edt: form.value.edt,
+        freqs: defaultFreqs,
+        base_freq: defaultBaseFreq,
+        meta: data.meta,
+      });
+      return;
+    }
+    if (!activeItem.value || (activeItem.value.bars || []).length === 0) {
+      console.warn('[StockDetail] 当前周期 bars 为空', {
+        symbol: symbol.value,
+        sdt: form.value.sdt,
+        edt: form.value.edt,
+        freqs: defaultFreqs,
+        base_freq: defaultBaseFreq,
+        activeFreq: store.activeFreq,
+        itemsKeys: itemsKeys.value,
+        meta: data.meta,
+      });
+    }
+  },
+  { deep: true }
+);
+
+const formatBarCounts = (counts: Record<string, number> | undefined) => {
+  if (!counts) return '-';
+  const keys = Object.keys(counts);
+  if (keys.length === 0) return '-';
+  return keys
+    .sort()
+    .map((k) => `${k}:${counts[k]}`)
+    .join(', ');
 };
 
 // 组件挂载时获取数据

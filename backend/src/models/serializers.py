@@ -36,7 +36,7 @@ def serialize_bi(bi: BI) -> Dict[str, Any]:
     :param bi: BI对象
     :return: 字典
     """
-    return {
+    out = {
         'symbol': bi.symbol,
         'sdt': bi.sdt.isoformat() if hasattr(bi.sdt, 'isoformat') else str(bi.sdt),
         'edt': bi.edt.isoformat() if hasattr(bi.edt, 'isoformat') else str(bi.edt),
@@ -45,6 +45,22 @@ def serialize_bi(bi: BI) -> Dict[str, Any]:
         'low': bi.low,
         'power': bi.power,
     }
+    # 补齐 to_echarts 所需的笔端点信息（用于前端画“笔”折线）
+    try:
+        out.update(
+            {
+                "fx_a_dt": bi.fx_a.dt.isoformat() if hasattr(bi.fx_a.dt, "isoformat") else str(bi.fx_a.dt),
+                "fx_a_fx": float(bi.fx_a.fx),
+                "fx_a_mark": bi.fx_a.mark.value,
+                "fx_b_dt": bi.fx_b.dt.isoformat() if hasattr(bi.fx_b.dt, "isoformat") else str(bi.fx_b.dt),
+                "fx_b_fx": float(bi.fx_b.fx),
+                "fx_b_mark": bi.fx_b.mark.value,
+            }
+        )
+    except Exception:
+        # 兼容部分 BI 对象不含 fx_a/fx_b 的情况
+        pass
+    return out
 
 
 def serialize_fx(fx: FX) -> Dict[str, Any]:

@@ -51,6 +51,51 @@ class AnalysisResponse(BaseModel):
     last_bi_power: Optional[float] = Field(None, description="最后一笔幅度")
 
 
+class LocalCzscItem(BaseModel):
+    """本地多周期 CZSC 分析单项（单一周期）"""
+
+    freq: str = Field(..., description="周期，如 1分钟/5分钟/15分钟/30分钟/60分钟（可选日线）")
+    bars: List[Dict[str, Any]] = Field(default_factory=list, description="RawBar 序列化列表")
+    bis: List[Dict[str, Any]] = Field(default_factory=list, description="BI 序列化列表")
+    fxs: List[Dict[str, Any]] = Field(default_factory=list, description="FX 序列化列表")
+    indicators: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="指标序列（用于 TradingVue 复刻 to_echarts）：vol / macd(diff,dea,macd) / sma(MA5/MA13/MA21)",
+    )
+    stats: Dict[str, Any] = Field(default_factory=dict, description="统计信息")
+
+
+class LocalCzscMeta(BaseModel):
+    """本地数据加载与多周期合成元数据（用于排障与解释数据范围）"""
+
+    data_root: Optional[str] = Field(None, description="本地数据根目录（.stock_data）")
+    parquet_count: int = Field(0, description="命中的 parquet 文件数量（按月聚合）")
+    rows_before_filter: int = Field(0, description="过滤前总行数（合并后）")
+    rows_after_filter: int = Field(0, description="按 period 与时间范围过滤后行数")
+    period_filtered: bool = Field(False, description="是否按 period==1 过滤为 1分钟数据")
+    dt_min: Optional[str] = Field(None, description="过滤后最小时间")
+    dt_max: Optional[str] = Field(None, description="过滤后最大时间")
+    base_freq: str = Field(..., description="BarGenerator 合成与分析的基础周期")
+    requested_freqs: List[str] = Field(default_factory=list, description="请求的周期列表（字符串）")
+    target_freqs: List[str] = Field(default_factory=list, description="实际输出的周期列表（字符串）")
+    generated_bar_counts: Dict[str, int] = Field(default_factory=dict, description="各周期合成后 bars 数量")
+    warnings: List[str] = Field(default_factory=list, description="校验/合成过程中的警告信息")
+
+
+class LocalCzscResponse(BaseModel):
+    """本地分钟数据驱动的多周期 CZSC 分析响应"""
+
+    symbol: str = Field(..., description="标的代码")
+    sdt: str = Field(..., description="开始时间（YYYYMMDD）")
+    edt: str = Field(..., description="结束时间（YYYYMMDD）")
+    base_freq: str = Field(..., description="合成与分析的基础周期（如 1分钟）")
+    items: Dict[str, LocalCzscItem] = Field(
+        default_factory=dict,
+        description="key 为周期名称（与 LocalCzscItem.freq 一致），如 1分钟/5分钟/15分钟/30分钟/60分钟（可选日线）",
+    )
+    meta: Optional[LocalCzscMeta] = Field(None, description="数据加载/过滤/合成元数据")
+
+
 class SignalRequest(BaseModel):
     """信号计算请求模型"""
     symbol: str = Field(..., description="标的代码")

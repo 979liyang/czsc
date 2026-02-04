@@ -106,3 +106,45 @@ pip install czsc -U -i https://pypi.python.org/simple
 
 13029727256
 15114579671Ly
+
+
+## backend
+
+# 从项目根目录运行
+./backend/install.sh
+
+# 1. 激活虚拟环境（从项目根目录）
+source venv/bin/activate
+
+# 2. 进入 backend 目录并安装依赖
+cd backend
+pip install -r requirements.txt
+
+# 3. 运行服务
+python run.py
+
+## Demo：本地 .stock_data → CZSC 多周期分析 → 前端 /stock/:symbol
+
+1）确保本地已有分钟数据（示例：600078.SH）：
+
+- 目录应存在：`.stock_data/raw/minute_by_stock/stock_code=600078.SH/`
+
+2）启动后端（FastAPI）：
+
+```bash
+cd backend
+python run.py
+```
+
+3）启动前端（Vue3）：
+
+```bash
+cd frontend
+npm run dev
+```
+
+4）浏览器打开（默认 sdt=20180101，demo=600078）：
+
+- `http://localhost:5173/stock/600078.SH`
+
+页面会从本地 `.stock_data` 读取分钟数据，并在后端计算 **30分钟 / 60分钟 / 日线** 三个维度的 CZSC 分析结果，前端用 `trading-vue-js` 展示。

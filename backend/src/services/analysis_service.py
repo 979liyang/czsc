@@ -60,7 +60,9 @@ class AnalysisService:
         result['fx_count'] = len(czsc.fx_list)
         result['finished_bi_count'] = len(czsc.finished_bis)
         result['bi_count'] = len(czsc.bi_list)
-        result['ubi_count'] = len(czsc.ubi) if czsc.ubi else 0
+        # ubi 是一个字典，需要检查是否存在
+        ubi = czsc.ubi
+        result['ubi_count'] = 1 if ubi else 0
         result['last_bi_extend'] = czsc.last_bi_extend
 
         # 提取最后一笔信息

@@ -258,6 +258,142 @@
 
 ---
 
+## Phase 9: User Story 1 - 股票详情页本地数据全流程（/stock/:symbol + 本地 .stock_data + 多周期 CZSC + TradingVue.js）(Priority: P1) 🎯
+
+**Goal**: 用户访问 `/stock/:symbol`，系统从本地 `.stock_data/raw/minute_by_stock` 读取该股票分钟数据（默认 sdt=20180101），
+在后端使用 `czsc` 计算 **30分钟、60分钟、日线** 三个维度的分析结果，并在前端使用 `trading-vue-js` 展示 K 线与 CZSC 分析标记（分型/笔）。
+
+**Independent Test**: 浏览器打开 `http://localhost:xxxx/stock/600078.SH`（demo），页面默认使用 `sdt=20180101`，
+可在 30分钟 / 60分钟 / 日线 三个维度切换查看图表与分析列表；无数据时有明确提示。
+
+### Foundational for US1（本地数据读取 + 多周期分析 API 契约）
+
+- [X] T120 [US1] 定义“本地多周期分析”响应结构（bars + fx/bi + stats），补充到 `backend/src/models/schemas.py`
+- [X] T121 [US1] 实现从本地 `.stock_data/raw/minute_by_stock` 读取分钟数据的服务（按年月 parquet 聚合），在 `backend/src/services/local_czsc_service.py`
+- [X] T122 [US1] 实现分钟→30/60/日线的重采样（复用 `czsc.resample_bars` / BarGenerator），在 `backend/src/services/local_czsc_service.py`
+- [X] T123 [US1] 实现对 30/60/日线分别运行 `CZSC(bars)` 并提取统计，封装在 `backend/src/services/local_czsc_service.py`
+- [X] T124 [US1] 增加序列化：把 `RawBar/FX/BI` 转为前端可用 JSON（复用 `backend/src/models/serializers.py`）
+- [X] T125 [US1] 新增 API：`GET /api/v1/stock/{symbol}/local_czsc`（默认 sdt=20180101），在 `backend/src/api/v1/analysis.py`
+- [ ] T126 [US1] 为本地读取加缓存/去重（按 symbol+sdt+edt 的 cache key），在 `backend/src/storage/cache.py` 或 `backend/src/services/*`
+
+### Frontend US1（路由 / 页面 / TradingVue.js 图表对接）
+
+- [X] T127 [P] [US1] 确认/完善前端路由 `/stock/:symbol` 指向详情页组件，在 `frontend/src/router/routes.ts`
+- [X] T128 [US1] 完善 `frontend/src/views/StockDetail.vue`：默认 `sdt=20180101`、`edt=今天`，并接入本地 CZSC 多周期接口
+- [X] T129 [US1] 新增前端 API 方法 `getLocalCzsc(symbol, sdt, edt)` 调用新接口，在 `frontend/src/api/analysis.ts`
+- [X] T130 [US1] 在 Pinia store 中新增 local-czsc 结果状态（30/60/日线三套数据），在 `frontend/src/stores/stockDetail.ts`
+- [X] T131 [US1] 在 `StockDetail.vue` 增加维度切换（Tabs：30分钟/60分钟/日线），切换时更新图表数据源与列表
+- [X] T132 [US1] 在 `frontend/src/components/KlineChartTradingVue.vue` 适配多周期数据输入（直接使用后端返回的 bars + overlays）
+- [X] T133 [US1] 在 `KlineChartTradingVue.vue` 映射 CZSC overlays：分型点位、笔标记（基于 FX/BI 序列化字段）
+- [X] T134 [US1] 在 `StockDetail.vue` 展示 FX/BI 列表与统计信息（随 Tabs 切换）
+- [x] T135 [US1] 增强错误处理：本地无 parquet / 时间范围无数据 / 接口异常，前端给出可读提示（含 demo 600078 的建议），在 `frontend/src/views/StockDetail.vue`
+
+### Demo & Docs（确保 600078 可跑通）
+
+- [X] T136 [US1] 增加 demo 数据说明与访问路径：在 `README.md` 写明默认 sdt=20180101 与 demo=600078.SH
+- [X] T137 [US1] 增加端到端说明：在 `backend/README.md` 与 `frontend/README.md` 写明接口与访问路径
+
+**Checkpoint**: 打开 `/stock/600078.SH` 可看到 TradingVue K线 + FX/BI 标记，且可切换 30分钟/60分钟/日线；默认从 20180101 开始加载。
+
+---
+
+## Phase 10: User Story 1 - 扩展分钟周期（1/5/15/30/60）+ 空数据日志 (Priority: P1)
+
+**Goal**: 服务端提供 **1、5、15、30、60 分钟**级别数据及对应 CZSC 分析数据（bars + fxs + bis + stats），
+并在“前端请求返回空数据”时补充清晰日志（前端 console + 后端 loguru）。
+
+**Independent Test**:
+1. 调用 `GET /api/v1/stock/600078.SH/local_czsc?sdt=20180101&edt=20181231&freqs=1,5,15,30,60` 返回 `items` 含 5 个周期键（`1分钟/5分钟/15分钟/30分钟/60分钟`），每个周期都含 `bars/fxs/bis/stats`。
+2. 当本地无 parquet 或时间范围无数据时：
+   - 后端日志打印：symbol/sdt/edt/freqs/base_path + 原因（未找到文件/过滤后为空）
+   - 前端页面打印：请求参数与返回 items.keys/rows 信息，并显示友好提示（引导使用 demo=600078）
+
+### Backend (Local CZSC 多分钟周期输出)
+
+- [x] T138 [US1] 扩展本地分析服务支持输出 1/5/15/30/60 分钟周期（由 1分钟基准 resample），在 `backend/src/services/local_czsc_service.py`
+- [x] T139 [US1] 扩展接口支持 query 参数 `freqs`（默认 1,5,15,30,60），并将响应 items 改为这些分钟周期（如需保留日线可新增 include_daily 参数），在 `backend/src/api/v1/analysis.py`
+- [x] T140 [US1] 扩展 Pydantic 响应模型说明 `freqs` 的返回语义（items keys），在 `backend/src/models/schemas.py`
+- [x] T141 [US1] 增加后端空数据日志：读取 parquet 数量、过滤后行数、最终 bars 数量；空数据时用 logger.warning 打印请求上下文，在 `backend/src/services/local_czsc_service.py`
+
+### Frontend (空数据日志 + 适配分钟周期列表)
+
+- [x] T142 [US1] 前端请求增加 `freqs=1,5,15,30,60`（可在 api 层固定默认），在 `frontend/src/api/analysis.ts`
+- [x] T143 [US1] StockDetail 增加“分钟周期 Tabs（1/5/15/30/60）”，并在切换时更新图表数据源与列表，在 `frontend/src/views/StockDetail.vue`
+- [x] T144 [US1] 增加前端空数据日志：当 `items` 为空/当前 activeItem.bars 为空时，console.warn 打印 symbol/sdt/edt/freqs 与返回 items keys，并给出页面提示（引导 demo=600078.SH、默认 sdt=20180101），在 `frontend/src/views/StockDetail.vue`
+- [x] T145 [US1] TradingVue 组件在 bars 为空时显示“当前周期无数据”的状态文本，并输出一次 debug 日志（仅开发环境），在 `frontend/src/components/KlineChartTradingVue.vue`
+
+---
+
+## Phase 11: User Story 1 - 使用 BarGenerator 合成多维度K线 + 回传元数据 (Priority: P1)
+
+**Goal**: 后端在读取到本地 `.stock_data/raw/minute_by_stock` 的分钟数据后，
+使用 `czsc.utils.BarGenerator` 按 base_freq 合成 `1/5/15/30/60` 分钟（可选日线）的多维度K线，
+再基于各周期K线分别执行 `CZSC(bars)` 分析；并将“数据加载/过滤/合成/分析”的关键元数据与分析结果一起返回给前端，
+前端用 `trading-vue-js` 绘制K线与 FX/BI 标记，同时展示元数据用于解释“为什么空 / 为什么少”。
+
+**Independent Test**:
+1. 调用 `GET /api/v1/stock/600078.SH/local_czsc?sdt=20180101&edt=20181231&freqs=1,5,15,30,60&base_freq=1分钟`
+   返回 `meta`（parquet_count/rows/dt_range/target_freqs 等）以及每个周期的 `items[freq]`（bars/fxs/bis/stats）。
+2. 若某个周期合成结果 bars=0，后端 `logger.warning` 打印原因（base_freq、目标freq、原始bars数量、dt范围），前端页面可读提示并给出建议。
+
+### Backend（BarGenerator 多维度合成 + 元数据回传）
+
+- [x] T146 [US1] 在 `backend/src/services/local_czsc_service.py` 增加 BarGenerator 合成流程：读取 base_freq 原始 bars（默认 1分钟），`bg.update(bar)` 合成 freqs（1/5/15/30/60，可选日线）
+- [x] T147 [US1] 在 `backend/src/services/local_czsc_service.py` 抽取“小函数”封装：df→RawBar 列表、BarGenerator 初始化、合成后 bars 获取、每周期 CZSC 分析（确保单函数≤30行，并补充中文注释）
+- [x] T148 [US1] 扩展响应结构：为本地分析增加 `meta` 字段（parquet_count、rows_before_filter、rows_after_filter、dt_min/dt_max、base_freq、target_freqs、generated_bar_counts、data_root 等），更新 `backend/src/models/schemas.py`
+- [x] T149 [US1] 扩展序列化/拼装：将 `meta` 与 `items` 一并返回，保证字段 JSON 兼容（必要时扩展 `backend/src/models/serializers.py`）
+- [x] T150 [US1] 扩展接口参数：`GET /api/v1/stock/{symbol}/local_czsc` 支持 `base_freq`（默认 1分钟）与 `include_daily`，并将 cache key 纳入 base_freq/freqs/include_daily，在 `backend/src/api/v1/analysis.py` 与 `backend/src/services/local_czsc_service.py`
+- [x] T151 [US1] 增强日志：打印 BarGenerator 合成前后各周期 bars 数量、空 bars 的原因与请求上下文（symbol/sdt/edt/base_freq/freqs/base_path），在 `backend/src/services/local_czsc_service.py`
+
+### Frontend（展示 meta + 与后端合成周期对齐）
+
+- [x] T152 [US1] 扩展 TS 类型：为 `LocalCzscResponseData` 增加 `meta` 类型定义，并在 `frontend/src/api/analysis.ts` 与 `frontend/src/types` 中对齐字段
+- [x] T153 [US1] StockDetail 展示元数据（例如 dt_range、rows、parquet_count、target_freqs、bars_counts），并在空数据时把 meta 一并打印到 console.warn，更新 `frontend/src/views/StockDetail.vue`
+- [x] T154 [US1] 前端请求支持 `base_freq` 参数（默认 1分钟），并确保 Tabs 的分钟周期与后端 `items` keys / `meta.target_freqs` 对齐，更新 `frontend/src/api/analysis.ts` 与 `frontend/src/stores/stockDetail.ts`
+- [x] T155 [US1] TradingVue 组件在接收到 `meta.generated_bar_counts[freq]=0` 或 `item.bars=[]` 时，显示更明确的“该周期合成后无数据”提示（开发环境仅一次 debug），更新 `frontend/src/components/KlineChartTradingVue.vue`
+
+### Dev Tooling（可选：用脚本对照验证 BarGenerator 逻辑）
+
+- [x] T156 [P] [US1] 扩展 `scripts/analyze_local_czsc.py`：新增 `--freqs` / `--base-freq` 参数，参考 `demo/barGenerator.py` 先 BarGenerator 合成再分析，输出 meta + html（用于与 API 行为对照）
+
+---
+
+## Phase 12: User Story 1 - TradingVue 复刻 CZSC.to_echarts 默认展示（含 日线 + 指标副图）(Priority: P1)
+
+**Goal**: 参考 `demo/analyze.py`、`demo/barGenerator.py` 与 `czsc/analyze.py: CZSC.to_echarts()`（内部调用 `czsc/utils/echarts_plot.py:kline_pro`），
+在打开前端 `/stock/SH600078` 页面后，从服务端获取 **1/5/15/30/60 分钟 + 日线** 的 K 线与 CZSC 分析数据，并用 `trading-vue-js` 绘制：
+K线主图 + 分型/笔标记（to_echarts 同款）+ 成交量柱 + MACD（以及可选均线系统 t_seq）。
+
+**Independent Test**:
+1. 访问 `http://localhost:xxxx/stock/SH600078`（或 `600078.SH`），默认请求 `freqs=1,5,15,30,60` 且 `include_daily=true`。
+2. 切换到任意周期（含 日线）：
+   - K线可见，FX/BI 标记可见
+   - 成交量/ MACD 副图可见（与 to_echarts 信息一致）
+3. 当某周期 bars 为空：页面显示“该周期合成后无数据”，同时 console.warn 打印 meta + counts。
+
+### Phase 12 - 学习与对齐（to_echarts 产物拆解）
+
+- [x] T157 [US1] 学习并记录 `czsc/analyze.py` 的 `CZSC.to_echarts()` 数据组织方式（kline/bi/fx）与 `czsc/utils/echarts_plot.py:kline_pro` 默认绘制项（vol/macd/sma），输出到 `docs/learning/czsc_to_echarts_mapping.md`
+- [x] T158 [US1] 补齐 `/stock/:symbol` 路由对 `SH600078`/`SZ000001`/`600078.SH` 的标准化（前端转为 `600078.SH` 或后端增强 `_normalize_symbol`），更新 `frontend/src/views/StockDetail.vue` 与/或 `backend/src/services/local_czsc_service.py`
+
+### Phase 12 - Backend（补齐 to_echarts 默认指标数据）
+
+- [x] T159 [US1] 扩展本地分析响应：为每个周期 item 增加 `indicators`（至少包含 `vol`、`macd(diff,dea,macd)`；可选 `sma`），更新 `backend/src/models/schemas.py`
+- [x] T160 [US1] 在 `backend/src/services/local_czsc_service.py` 为每个周期 bars 计算指标序列（复用 `czsc/utils/ta.py` 的 `MACD`/`SMA`），并写入 item.indicators（确保单函数≤30行）
+- [x] T161 [US1] 扩展序列化：保证指标序列 JSON 友好（数值/时间对齐），必要时更新 `backend/src/models/serializers.py`
+- [x] T162 [US1] 扩展接口说明与示例：`GET /api/v1/stock/{symbol}/local_czsc` 明确 `include_daily=true` 可返回 `日线` item，更新 `backend/README.md`
+
+### Phase 12 - Frontend（TradingVue 多面板绘制：K线+成交量+MACD）
+
+- [x] T163 [US1] 扩展 TS 类型：为 `LocalCzscItemData` 增加 `indicators` 类型（vol/macd/sma），更新 `frontend/src/api/analysis.ts`（以及如有需要的 `frontend/src/types`）
+- [x] T164 [US1] StockDetail Tabs 增加“日线”，并请求 `include_daily=true`；切换时根据 `meta.target_freqs` 动态渲染可用周期，更新 `frontend/src/views/StockDetail.vue` 与 `frontend/src/stores/stockDetail.ts`
+- [x] T165 [US1] 在 `frontend/src/components/KlineChartTradingVue.vue` 增加副图渲染：成交量柱、MACD（以及可选 SMA），要求与 `kline_pro` 信息一致；bars 为空保持空态提示
+- [x] T166 [US1] 增强调试：开发环境下输出一次“to_echarts 对齐检查”debug（包含 freq、bars_count、indicator_lengths），更新 `frontend/src/components/KlineChartTradingVue.vue`
+
+### Phase 12 - Dev Tooling（对照验证）
+
+- [x] T167 [P] [US1] 扩展 `scripts/analyze_local_czsc.py`：新增 `--include-indicators`，输出与 API 同款 indicators 元数据（用于与 TradingVue 渲染对照）
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

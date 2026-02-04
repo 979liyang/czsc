@@ -42,7 +42,7 @@ def create_all_directories() -> bool:
     logger.info("=" * 80)
     
     # 存储根目录
-    storage_root = project_root / "stock_data"
+    storage_root = project_root / ".stock_data"
     
     # 定义目录结构
     directories = [

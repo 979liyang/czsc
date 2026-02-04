@@ -105,3 +105,20 @@ symbols/SSE-000001/
 
 ### 形态
 
+### 从某个股票之后开始跑数据
+python scripts/fetch_tushare_minute_data_stk_mins.py --freq 1min --start-date "2018-01-01 09:00:00" --end-date "2026-01-31 19:00:00" --resume-after 000615.SZ
+
+### 另外如果你想用自动断点续跑
+python scripts/fetch_tushare_minute_data_stk_mins.py --freq 1min --start-date "2018-01-01 09:00:00" --end-date "2026-01-31 19:00:00" --checkpoint
+
+
+sz	深圳证券交易所
+000001-004999（主板）
+300000-309999（创业板）
+002000-002999（中小板）
+
+
+sh	上海证券交易所	
+600000-603999（主板）
+605000-605999（主板）
+688000-688999（科创板）
