@@ -527,7 +527,7 @@ def _run_batch(pro, stocks: List[str], args, ckpt_path: Optional[Path]) -> None:
     ok_cnt = 0
     total = len(stocks)
 
-    concurrency = int(getattr(args, "concurrency", 2) or 2)
+    concurrency = int(getattr(args, "concurrency", 1) or 1)
     if concurrency <= 0:
         concurrency = 1
 

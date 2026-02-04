@@ -73,7 +73,7 @@ if str(project_root) not in sys.path:
 
 
 # 默认 Tushare token（按你的要求写死）
-DEFAULT_TUSHARE_TOKEN = "5049652140394706635"
+DEFAULT_TUSHARE_TOKEN = "5049750782419706635"
 
 # 长区间请求可能被接口行数/条数限制截断，这里固定按“两个月两个月”分片请求
 CHUNK_MONTHS = 2

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-使用自定义 Tushare 分钟权限接口（stk_mins）批量采集深证股票分钟数据并保存到本地 parquet。
+使用自定义 Tushare 分钟权限接口（stk_mins）批量采集上证股票分钟数据并保存到本地 parquet。
 
-只获取深证股票：不指定 --stocks 时拉取深圳证券交易所（SZSE）全部上市股票（.SZ）；
-指定 --stocks 时仅保留其中的 .SZ 代码，非深证代码（如 .SH）会被忽略。
+只获取上证股票：不指定 --stocks 时拉取上海证券交易所（SSE）全部上市股票（.SH）；
+指定 --stocks 时仅保留其中的 .SH 代码，非上证代码（如 .SZ）会被忽略。
 
 要求：
 - 入参与 scripts/fetch_tushare_minute_data.py 保持一致
@@ -17,32 +17,33 @@
 
 使用案例：
 1）先小规模验证（推荐）
-    python scripts/fetch_tushare_minute_data_stk_mins_sz.py --freq 1min --limit 10
+    python scripts/fetch_tushare_minute_data_stk_mins_sh.py --freq 1min --limit 10
 
-2）不指定股票时仅采集深证股票
-    python scripts/fetch_tushare_minute_data_stk_mins_sz.py --freq 1min --checkpoint
+2）不指定股票时仅采集上证股票
+    python scripts/fetch_tushare_minute_data_stk_mins_sh.py --freq 1min --checkpoint
 
-3）采集指定深证股票（逗号分隔）
-    python scripts/fetch_tushare_minute_data_stk_mins_sz.py --freq 1min --stocks 000001.SZ,000002.SZ
+3）采集指定上证股票（逗号分隔）
+    python scripts/fetch_tushare_minute_data_stk_mins_sh.py --freq 1min --stocks 600000.SH,600519.SH
 
 4）指定日期范围（支持两种格式）
     - YYYYMMDD：内部会转换为 stk_mins 的 datetime 字符串
     - YYYY-MM-DD HH:MM:SS：原样传给 stk_mins
-    python scripts/fetch_tushare_minute_data_stk_mins_sz.py --freq 1min --start-date 20240101 --end-date 20240105 --limit 10
-    python scripts/fetch_tushare_minute_data_stk_mins_sz.py --freq 1min --start-date "2018-01-01 09:00:00" --end-date "2026-02-02 19:00:00" --stocks 000001.SZ
+    python scripts/fetch_tushare_minute_data_stk_mins_sh.py --freq 1min --start-date 20240101 --end-date 20240105 --limit 10
+    python scripts/fetch_tushare_minute_data_stk_mins_sh.py --freq 1min --start-date "2018-01-01 09:00:00" --end-date "2026-02-02 19:00:00"
+    python scripts/fetch_tushare_minute_data_stk_mins_sh.py --freq 1min --start-date "2018-01-01 09:00:00" --end-date "2026-02-02 19:00:00" --stocks 601127.SH
 
 5）覆盖模式（不与本地已有数据合并去重）
-    python scripts/fetch_tushare_minute_data_stk_mins_sz.py --freq 1min --no-incremental --limit 10
+    python scripts/fetch_tushare_minute_data_stk_mins_sh.py --freq 1min --no-incremental --limit 10
 
 6）控制频率（避免被限速/封禁）
-    python scripts/fetch_tushare_minute_data_stk_mins_sz.py --freq 1min --sleep 0.2 --limit 10 
+    python scripts/fetch_tushare_minute_data_stk_mins_sh.py --freq 1min --sleep 0.2 --limit 10
 
 7）断点续跑（从某只股票之后继续）
-    python scripts/fetch_tushare_minute_data_stk_mins_sz.py --freq 1min --resume-after 000001.SZ
-    python scripts/fetch_tushare_minute_data_stk_mins_sz.py --freq 1min --start-date "2018-01-01 09:00:00" --end-date "2026-02-02 19:00:00" --resume-after 300296.SZ
+    python scripts/fetch_tushare_minute_data_stk_mins_sh.py --freq 1min --resume-after 600000.SH
+    python scripts_o/fetch_tushare_minute_data_stk_mins_sh.py --freq 1min --start-date "2018-01-01 09:00:00" --end-date "2026-02-02 19:00:00" --resume-after 600310.SH
 
 8）断点续跑（自动 checkpoint）
-    python scripts/fetch_tushare_minute_data_stk_mins_sz.py --freq 1min --checkpoint
+    python scripts/fetch_tushare_minute_data_stk_mins_sh.py --freq 1min --checkpoint
 
 说明：
 - 本脚本已内置默认 token（按需写死），默认不需要传入 --token / 设置环境变量
@@ -51,7 +52,7 @@
 数据落盘说明：
 - 输出为 parquet，按股票 + 年份目录、按月份文件拆分
 - 文件示例：
-  .stock_data/raw/minute_by_stock/stock_code=000001.SZ/year=2024/000001.SZ_2024-01.parquet
+  .stock_data/raw/minute_by_stock/stock_code=600000.SH/year=2024/600000.SH_2024-01.parquet
 - parquet 内字段（至少包含）：
   timestamp, stock_code, open, high, low, close, volume, amount, period
 """
@@ -73,7 +74,9 @@ if str(project_root) not in sys.path:
 
 
 # 默认 Tushare token（按你的要求写死）
-DEFAULT_TUSHARE_TOKEN = "5049652140394706635"
+DEFAULT_TUSHARE_TOKEN = "5049750782419706635"
+# 5049750782419706635
+# 5049652140394706635
 
 # 长区间请求可能被接口行数/条数限制截断，这里固定按“两个月两个月”分片请求
 CHUNK_MONTHS = 2
@@ -103,10 +106,10 @@ def _normalize_ts_code(x: Optional[str]) -> Optional[str]:
 
 
 def _default_checkpoint_path(freq: str) -> Path:
-    """默认 checkpoint 路径（按 freq 区分，深证脚本单独文件）"""
+    """默认 checkpoint 路径（按 freq 区分，上证脚本单独文件）"""
     d = project_root / ".stock_data" / ".checkpoints"
     d.mkdir(parents=True, exist_ok=True)
-    return d / f"fetch_stk_mins_sz_{freq}.txt"
+    return d / f"fetch_stk_mins_sh_{freq}.txt"
 
 
 def _read_checkpoint(path: Path) -> Optional[str]:
@@ -455,20 +458,20 @@ def fetch_one_stock(pro, ts_code: str, freq: str, incremental: bool, sdt: Option
 
 
 def build_stock_list(pro, stocks_arg: Optional[str], limit: Optional[int]) -> List[str]:
-    """构建待处理股票列表：仅深证股票。不指定 --stocks 时拉取深证全部；指定时仅保留 .SZ，忽略 .SH 等。"""
+    """构建待处理股票列表：仅上证股票。不指定 --stocks 时拉取上证全部；指定时仅保留 .SH，忽略 .SZ 等。"""
     stocks = _parse_stocks(stocks_arg)
     if stocks is None:
-        # 仅深证所有股票：exchange="SZSE"
-        df = pro.stock_basic(exchange="SZSE", list_status="L", fields="ts_code")
+        # 仅上证所有股票：exchange="SSE"
+        df = pro.stock_basic(exchange="SSE", list_status="L", fields="ts_code")
         stocks = sorted(df["ts_code"].dropna().unique().tolist()) if df is not None and len(df) > 0 else []
-        stocks = [x for x in stocks if str(x).endswith(".SZ")]
+        stocks = [x for x in stocks if str(x).endswith(".SH")]
     else:
-        # 用户指定了 --stocks 时也只保留深证 .SZ，忽略其它
+        # 用户指定了 --stocks 时也只保留上证 .SH，忽略其它
         before = len(stocks)
-        stocks = [x for x in stocks if str(x).endswith(".SZ")]
+        stocks = [x for x in stocks if str(x).endswith(".SH")]
         dropped = before - len(stocks)
         if dropped:
-            logger.info(f"仅采集深证股票，已忽略 {dropped} 只非深证代码（.SH 等）")
+            logger.info(f"仅采集上证股票，已忽略 {dropped} 只非上证代码（.SZ 等）")
     if limit:
         stocks = stocks[:limit]
     return stocks
@@ -495,24 +498,18 @@ def main():
 
 def _parse_args():
     """解析命令行参数"""
-    parser = argparse.ArgumentParser(description="Tushare stk_mins 分钟数据批量采集（仅深证股票）")
+    parser = argparse.ArgumentParser(description="Tushare stk_mins 分钟数据批量采集（仅上证股票）")
     parser.add_argument("--token", type=str, default=None, help="Tushare Token（可选；不传则使用脚本内置默认 token）")
     parser.add_argument("--freq", type=str, default="1min", choices=["1min", "5min", "15min", "30min", "60min"], help="分钟周期")
     parser.add_argument("--start-date", type=str, default=None, help="开始日期（YYYYMMDD 或 YYYY-MM-DD HH:MM:SS，可选）")
     parser.add_argument("--end-date", type=str, default=None, help="结束日期（YYYYMMDD 或 YYYY-MM-DD HH:MM:SS，可选）")
-    parser.add_argument("--stocks", type=str, default=None, help="指定股票列表（逗号分隔），如 000001.SZ,000002.SZ；不指定则拉取全部深证股票")
+    parser.add_argument("--stocks", type=str, default=None, help="指定股票列表（逗号分隔），如 600000.SH,600519.SH；不指定则拉取全部上证股票")
     parser.add_argument("--limit", type=int, default=None, help="最多处理多少只股票（用于测试）")
     parser.add_argument("--concurrency", type=int, default=2, help="并发请求股票数（默认 2）")
-    parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=None,
-        help="兼容参数：等同于 --concurrency（并发请求股票数）。如果同时传入，以 --batch-size 为准。",
-    )
     parser.add_argument("--sleep", type=float, default=0.0, help="每只股票处理间隔（秒）")
     parser.add_argument("--incremental", action="store_true", default=True, help="增量模式（默认启用）")
     parser.add_argument("--no-incremental", dest="incremental", action="store_false", help="覆盖模式（不增量）")
-    parser.add_argument("--resume-after", type=str, default=None, help="从某只股票之后继续（跳过该股票本身），如 000001.SZ")
+    parser.add_argument("--resume-after", type=str, default=None, help="从某只股票之后继续（跳过该股票本身），如 600000.SH")
     parser.add_argument(
         "--checkpoint",
         action="store_true",
@@ -532,11 +529,7 @@ def _run_batch(pro, stocks: List[str], args, ckpt_path: Optional[Path]) -> None:
     ok_cnt = 0
     total = len(stocks)
 
-    # 并发数：优先使用 batch-size（兼容参数），否则用 concurrency
-    concurrency_raw = getattr(args, "batch_size", None)
-    if concurrency_raw is None:
-        concurrency_raw = getattr(args, "concurrency", 1)
-    concurrency = int(concurrency_raw or 1)
+    concurrency = int(getattr(args, "concurrency", 1) or 1)
     if concurrency <= 0:
         concurrency = 1
 
@@ -585,7 +578,8 @@ def _run_batch(pro, stocks: List[str], args, ckpt_path: Optional[Path]) -> None:
                 logger.warning("checkpoint 模式下检测到失败；为避免跳过失败股票，已停止后续批次。请重试继续。")
                 break
 
-            # 每个 chunk 之间的节奏控制：并发时避免按“每只”sleep 被放大
+            # 每个 chunk 之间的节奏控制：仍保留 sleep（按“每只”语义近似处理）
+            # 这里按 chunk 后 sleep 一次，避免并发时 sleep 被放大
             _sleep_if_needed(args.sleep)
 
     logger.info(f"完成：成功 {ok_cnt}/{total}")
