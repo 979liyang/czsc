@@ -109,6 +109,25 @@ class DocService:
         signals = re.findall(r"Signal\('([^']+)'\)", doc)
         return signals
 
+    def _get_data_requirements(self, signal_func_name: str) -> Dict[str, Any]:
+        """
+        给信号函数打一个“经验性”的数据需求标签
+
+        说明：
+        - CZSC 信号的真实数据需求与具体实现有关，这里给一个“够用”的经验值用于指导数据维护
+        - 后续如需更精确，可按信号函数内部用到的指标窗口长度进一步细化
+        """
+
+        prefix = signal_func_name.split("_")[0] if "_" in signal_func_name else signal_func_name
+        # 经验规则：大多数信号至少需要 200~500 根基础K线，缠论类一般更长
+        if prefix in {"cxt", "byi"}:
+            return {"freq": "1分钟", "needed_bars": 3000}
+        if prefix in {"tas", "bar", "vol"}:
+            return {"freq": "1分钟", "needed_bars": 1000}
+        if prefix in {"pos", "stock", "xls"}:
+            return {"freq": "日线", "needed_bars": 500}
+        return {"freq": "1分钟", "needed_bars": 800}
+
     def get_all_signals(self) -> List[Dict[str, Any]]:
         """
         获取所有信号函数信息
@@ -174,6 +193,7 @@ class DocService:
                         'params': params,
                         'signals': signal_list,
                         'signature': str(sig),
+                        'data_requirements': self._get_data_requirements(name),
                     }
                     signals.append(signal_info)
 

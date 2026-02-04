@@ -77,7 +77,7 @@ if str(project_root) not in sys.path:
 DEFAULT_TUSHARE_TOKEN = "5049652140394706635"
 
 # 长区间请求可能被接口行数/条数限制截断，这里固定按“两个月两个月”分片请求
-CHUNK_MONTHS = 2
+CHUNK_MONTHS = 1
 
 
 def _parse_stocks(stocks: Optional[str]) -> Optional[List[str]]:

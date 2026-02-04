@@ -53,6 +53,18 @@ import os
 os.environ['CZSC_LOG_LEVEL'] = 'INFO'  # DEBUG, INFO, WARNING, ERROR
 ```
 
+#### 后端安装方案
+
+```python
+# 方案 A（推荐）：安装后端依赖
+pip install -r backend/requirements.txt
+
+# 方案 B：如果你用虚拟环境，先激活再装
+python -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
+```
+
 #### 缓存配置
 CZSC 使用本地缓存存储数据，默认路径在用户主目录下的 `.czsc` 文件夹：
 

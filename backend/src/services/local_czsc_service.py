@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
@@ -75,12 +75,18 @@ def _minute_files(base_path: Path, symbol: str, y: int, m: int) -> Path:
 
 
 def _normalize_freqs(freqs: Optional[str]) -> str:
-    """标准化 freqs 参数，返回排序去重后的字符串，如 '1,5,15,30,60'"""
+    """
+    标准化 freqs 参数，返回排序去重后的字符串，如 '1,5,15,30,60'
+    支持单周期请求：如 "30"、"60"、"日线"
+    """
     if not freqs:
         return "1,5,15,30,60"
     parts = [p.strip() for p in str(freqs).split(",") if p.strip()]
     mins: List[int] = []
     for p in parts:
+        # 支持 "日线" 字符串（在 _targets_from 中处理）
+        if p == "日线" or p == "日":
+            continue
         if not p.isdigit():
             continue
         mins.append(int(p))
@@ -90,10 +96,17 @@ def _normalize_freqs(freqs: Optional[str]) -> str:
 
 
 def _targets_from(freqs: str, include_daily: bool) -> List[Freq]:
-    """由 freqs 字符串生成目标周期列表"""
-    mins = [int(x) for x in _normalize_freqs(freqs).split(",")]
+    """
+    由 freqs 字符串生成目标周期列表
+    支持单周期请求：如 "30"、"60"、"日线"
+    """
+    # 检查是否包含 "日线" 字符串
+    freqs_str = str(freqs) if freqs else ""
+    has_daily_in_freqs = "日线" in freqs_str or "日" in freqs_str
+    
+    mins = [int(x) for x in _normalize_freqs(freqs).split(",") if x.strip().isdigit()]
     out = [Freq(f"{m}分钟") for m in mins]
-    if include_daily:
+    if include_daily or has_daily_in_freqs:
         out.append(Freq("日线"))
     return out
 
@@ -160,6 +173,37 @@ def _freq_minutes(freq_value: str) -> int:
     if freq_value.endswith("分钟"):
         return int(freq_value.replace("分钟", ""))
     return 10**9
+
+
+def _get_recent_months_range(edt: pd.Timestamp, recent_months: int = 3) -> pd.Timestamp:
+    """
+    计算最近N个月的开始日期
+    
+    时间范围控制说明：
+    - 用于计算K线数据的过滤时间范围
+    - 根据结束日期向前推 recent_months 个月，作为K线数据的开始日期
+    - 例如：edt=2024-12-31, recent_months=3 -> 返回 2024-10-01（最近3个月的开始日期）
+    
+    :param edt: 结束日期
+    :param recent_months: 最近几个月（默认3）
+    :return: 开始日期（edt 向前推 recent_months 个月）
+    """
+    # 计算开始日期：从 edt 向前推 recent_months 个月
+    # 使用 relativedelta 或手动计算月份
+    try:
+        from dateutil.relativedelta import relativedelta
+        sdt = edt - relativedelta(months=recent_months)
+    except ImportError:
+        # 如果没有 dateutil，使用简单的月份计算
+        year = edt.year
+        month = edt.month
+        # 向前推 recent_months 个月
+        month -= recent_months
+        while month <= 0:
+            month += 12
+            year -= 1
+        sdt = pd.Timestamp(year=year, month=month, day=1)
+    return sdt
 
 
 def _requested_freq_values(freqs: str, include_daily: bool) -> List[str]:
@@ -259,9 +303,31 @@ def _empty_result(symbol: str, sdt: str, edt: str, base_freq: str, meta: Dict[st
 
 
 def _analyze_items(
-    symbol: str, sdt: str, edt: str, base_freq: str, targets: List[str], df_minute: pd.DataFrame, meta: Dict[str, Any]
+    symbol: str,
+    sdt: str,
+    edt: str,
+    base_freq: str,
+    targets: List[str],
+    df_minute: pd.DataFrame,
+    meta: Dict[str, Any],
+    bars_offset: int = 0,
+    bars_limit: int = 0,
+    fxs_offset: int = 0,
+    fxs_limit: int = 0,
+    bis_offset: int = 0,
+    bis_limit: int = 0,
+    recent_months: int = 0,
 ) -> Tuple[Dict[str, Any], Dict[str, int], Dict[str, Any]]:
-    """用 BarGenerator 生成多周期 bars 并分析，返回 (items, counts, meta)"""
+    """
+    用 BarGenerator 生成多周期 bars 并分析，返回 (items, counts, meta)
+    
+    时间范围控制说明：
+    - 使用全量 bars 进行 CZSC 分析（确保分析准确性）
+    - 如果 recent_months > 0，返回的 bars 只包含最近 recent_months 个月的数据
+    - 分析数据（fxs、bis）基于全量数据计算，返回全量结果
+    
+    支持分页参数，只返回请求范围的数据
+    """
     minute_bars = _df_to_raw_bars(df_minute, "1分钟")
     base_bars = _build_base_bars(minute_bars, base_freq)
     if not base_bars:
@@ -270,6 +336,10 @@ def _analyze_items(
         logger.warning(f"本地CZSC {symbol} {msg} | minute_bars={len(minute_bars)} | {sdt} ~ {edt}")
         return {}, {}, meta
     bars_map = _build_multi_freq_bars(base_bars, base_freq, targets)
+    
+    # 计算结束日期（用于时间范围过滤）
+    edt_dt = pd.to_datetime(edt)
+    
     items: Dict[str, Any] = {}
     counts: Dict[str, int] = {}
     for f, bars in bars_map.items():
@@ -278,15 +348,120 @@ def _analyze_items(
             logger.warning(f"本地CZSC合成后为空: {symbol} | base={base_freq} | target={f} | {sdt} ~ {edt}")
         else:
             logger.info(f"本地CZSC合成完成: {symbol} | base={base_freq} | target={f} | bars={len(bars)}")
-        items[f] = {"freq": f, "indicators": _calc_indicators(bars), **_analyze_one(bars)}
+        
+        # 分析：使用全量 bars 进行分析，但返回的 bars 可能被过滤
+        analyze_result = _analyze_one(
+            bars,
+            bars_offset,
+            bars_limit,
+            fxs_offset,
+            fxs_limit,
+            bis_offset,
+            bis_limit,
+            recent_months,
+            edt_dt,
+        )
+        
+        # 计算指标：基于全量 bars 计算指标（确保指标准确性）
+        # 注意：指标应该基于全量数据计算，而不是过滤后的数据
+        # 这样可以确保指标（如均线、MACD）的准确性
+        indicators = _calc_indicators(bars)
+        
+        items[f] = {
+            "freq": f,
+            "indicators": indicators,
+            **analyze_result,
+        }
+        
+        # 记录时间范围信息
+        if recent_months > 0 and bars:
+            bars_start_dt = _get_recent_months_range(edt_dt, recent_months)
+            logger.info(
+                f"时间范围控制: {symbol} {f} 全量bars={len(bars)}条 "
+                f"返回bars={len(analyze_result['bars'])}条 "
+                f"分析数据(fxs={len(analyze_result['fxs'])}, bis={len(analyze_result['bis'])})基于全量数据 "
+                f"K线时间范围={bars_start_dt.strftime('%Y-%m-%d')} ~ {edt_dt.strftime('%Y-%m-%d')}"
+            )
+    
     return items, counts, meta
 
 
-def _analyze_one(bars: List[RawBar]) -> Dict[str, Any]:
-    """对单一周期 bars 做 CZSC 分析并序列化"""
+def _analyze_one(
+    bars: List[RawBar],
+    bars_offset: int = 0,
+    bars_limit: int = 0,
+    fxs_offset: int = 0,
+    fxs_limit: int = 0,
+    bis_offset: int = 0,
+    bis_limit: int = 0,
+    recent_months: int = 0,
+    edt: Optional[pd.Timestamp] = None,
+) -> Dict[str, Any]:
+    """
+    对单一周期 bars 做 CZSC 分析并序列化
+    
+    时间范围控制说明（核心功能）：
+    - 使用全量 bars 进行 CZSC 分析（确保分析准确性）
+    - 如果 recent_months > 0，返回的 bars 只包含最近 recent_months 个月的数据
+    - 分析数据（fxs、bis）基于全量数据计算，返回全量结果（不受 recent_months 限制）
+    - 这确保了分析准确性（基于全量数据），同时减少了K线数据传输量（只传输最近N个月）
+    
+    分页参数说明（与 recent_months 配合使用）：
+    - 数据按时间升序排列（最老的在前面，最新的在后面）
+    - offset: 跳过前面的 offset 条（从最老的数据开始跳过）
+    - limit: 返回 limit 条数据（0 表示返回全部）
+    """
     if not bars:
         return {"bars": [], "bis": [], "fxs": [], "stats": {"bars_raw_count": 0}}
+    
+    # 使用全量 bars 进行 CZSC 分析（确保分析准确性）
     cz = CZSC(bars)
+    
+    # 获取总数（用于分页元数据）
+    bars_total = len(bars)
+    fxs_total = len(cz.fx_list)
+    bis_total = len(cz.bi_list)
+    
+    # 序列化数据（bars 已经是按时间升序的）
+    bars_serialized = serialize_raw_bars(bars)
+    fxs_serialized = serialize_fxs(cz.fx_list)  # 分析数据：基于全量数据，返回全量结果
+    bis_serialized = serialize_bis(cz.bi_list)  # 分析数据：基于全量数据，返回全量结果
+    
+    # 时间范围过滤：如果指定了 recent_months，只返回最近N个月的 bars
+    if recent_months > 0 and edt is not None and bars_serialized:
+        # 计算最近N个月的开始日期
+        bars_start_dt = _get_recent_months_range(edt, recent_months)
+        # 过滤 bars：只保留最近N个月的数据
+        bars_serialized = [b for b in bars_serialized if pd.to_datetime(b["dt"]) >= bars_start_dt]
+        logger.info(
+            f"K线数据时间范围过滤: 全量={bars_total}条 过滤后={len(bars_serialized)}条 "
+            f"时间范围={bars_start_dt.strftime('%Y-%m-%d')} ~ {edt.strftime('%Y-%m-%d')}"
+        )
+    
+    # 分页处理：从末尾开始取（最新的数据在末尾）
+    # offset=0, limit=100: 取最后100条（最新的）
+    # offset=100, limit=100: 取倒数101-200条（更早的）
+    if bars_limit > 0:
+        start_idx = max(0, len(bars_serialized) - bars_offset - bars_limit)
+        end_idx = len(bars_serialized) - bars_offset
+        bars_serialized = bars_serialized[start_idx:end_idx] if end_idx > 0 else []
+    elif bars_offset > 0:
+        bars_serialized = bars_serialized[: len(bars_serialized) - bars_offset] if bars_offset < len(bars_serialized) else []
+    
+    if fxs_limit > 0:
+        start_idx = max(0, fxs_total - fxs_offset - fxs_limit)
+        end_idx = fxs_total - fxs_offset
+        fxs_serialized = fxs_serialized[start_idx:end_idx] if end_idx > 0 else []
+    elif fxs_offset > 0:
+        fxs_serialized = fxs_serialized[: fxs_total - fxs_offset] if fxs_offset < fxs_total else []
+    
+    if bis_limit > 0:
+        start_idx = max(0, bis_total - bis_offset - bis_limit)
+        end_idx = bis_total - bis_offset
+        bis_serialized = bis_serialized[start_idx:end_idx] if end_idx > 0 else []
+    elif bis_offset > 0:
+        bis_serialized = bis_serialized[: bis_total - bis_offset] if bis_offset < bis_total else []
+    
     stats = {
         "bars_raw_count": len(cz.bars_raw),
         "bars_ubi_count": len(cz.bars_ubi),
@@ -298,7 +473,20 @@ def _analyze_one(bars: List[RawBar]) -> Dict[str, Any]:
         "last_bi_direction": cz.finished_bis[-1].direction.value if cz.finished_bis else None,
         "last_bi_power": float(cz.finished_bis[-1].power) if cz.finished_bis else None,
     }
-    return {"bars": serialize_raw_bars(bars), "bis": serialize_bis(cz.bi_list), "fxs": serialize_fxs(cz.fx_list), "stats": stats}
+    
+    result = {
+        "bars": bars_serialized,
+        "bis": bis_serialized,  # 全量结果
+        "fxs": fxs_serialized,  # 全量结果
+        "stats": stats,
+    }
+    
+    # 保存总数（用于分页元数据，后续会被清理）
+    result["_bars_total"] = bars_total
+    result["_fxs_total"] = fxs_total
+    result["_bis_total"] = bis_total
+    
+    return result
 
 
 def _calc_vol_series(bars: List[RawBar]) -> List[List[float]]:
@@ -354,8 +542,25 @@ class LocalCzscService:
         freqs: Optional[str] = None,
         include_daily: bool = False,
         base_freq: Optional[str] = None,
+        bars_offset: int = 0,
+        bars_limit: int = 0,
+        fxs_offset: int = 0,
+        fxs_limit: int = 0,
+        bis_offset: int = 0,
+        bis_limit: int = 0,
+        recent_months: int = 0,
     ) -> Dict[str, Any]:
-        """对指定分钟周期（可选日线）进行分析并返回"""
+        """
+        对指定分钟周期（可选日线）进行分析并返回
+        
+        时间范围控制说明：
+        - recent_months: 返回的K线数据只包含最近N个月（默认0表示返回全部）
+        - 分析数据（fxs、bis）基于全量历史数据计算，返回全量结果（不受 recent_months 限制）
+        
+        分页参数说明：
+        - offset: 数据偏移量（从第几条开始）
+        - limit: 数据数量限制（0 表示返回全部，>0 时只返回指定数量）
+        """
         sym = _normalize_symbol(symbol)
         sdt_dt = _parse_dt(sdt, "20180101")
         edt_dt = _parse_dt(edt, datetime.now().strftime("%Y%m%d"))
@@ -371,21 +576,50 @@ class LocalCzscService:
             freqs_norm,
             bool(include_daily),
             base_freq_norm,
+            bars_offset,
+            bars_limit,
+            fxs_offset,
+            fxs_limit,
+            bis_offset,
+            bis_limit,
+            recent_months,
         )
 
 
-@lru_cache(maxsize=64)
 def _analyze_cached(
-    base_path: str, symbol: str, sdt: str, edt: str, freqs: str, include_daily: bool, base_freq: str
+    base_path: str,
+    symbol: str,
+    sdt: str,
+    edt: str,
+    freqs: str,
+    include_daily: bool,
+    base_freq: str,
+    bars_offset: int = 0,
+    bars_limit: int = 0,
+    fxs_offset: int = 0,
+    fxs_limit: int = 0,
+    bis_offset: int = 0,
+    bis_limit: int = 0,
+    recent_months: int = 0,
 ) -> Dict[str, Any]:
-    """带缓存的分析入口（避免重复计算）"""
+    """
+    带缓存的分析入口（避免重复计算）
+    
+    注意：由于分页参数会影响返回结果，缓存键需要包含分页参数。但为了性能，我们只在没有分页参数时使用缓存。
+    """
     bp = Path(base_path)
     sdt_dt = pd.to_datetime(sdt)
     edt_dt = pd.to_datetime(edt)
     requested = _requested_freq_values(freqs, include_daily)
     targets, warnings = _validate_freqs(base_freq, requested)
+    
+    # 判断是否有分页参数
+    has_pagination = bars_limit > 0 or fxs_limit > 0 or bis_limit > 0
+    
     logger.info(
-        f"本地CZSC分析(BarGenerator): {symbol} base={base_freq} -> {','.join(targets)} | {sdt} ~ {edt}"
+        f"本地CZSC分析(BarGenerator): {symbol} base={base_freq} 请求周期={freqs} include_daily={include_daily} -> 目标周期={','.join(targets)} | {sdt} ~ {edt} "
+        f"分页参数: bars({bars_offset},{bars_limit}) fxs({fxs_offset},{fxs_limit}) bis({bis_offset},{bis_limit}) "
+        f"时间范围控制: recent_months={recent_months}"
     )
     df_minute, df_meta = _load_minute_df_with_meta(bp, symbol, sdt_dt, edt_dt)
     meta = _build_meta(bp, df_minute, df_meta, base_freq, requested, targets, warnings)
@@ -395,7 +629,83 @@ def _analyze_cached(
         )
         return _empty_result(symbol, sdt, edt, base_freq, meta)
 
-    items, counts, meta = _analyze_items(symbol, sdt, edt, base_freq, targets, df_minute, meta)
+    items, counts, meta = _analyze_items(
+        symbol,
+        sdt,
+        edt,
+        base_freq,
+        targets,
+        df_minute,
+        meta,
+        bars_offset,
+        bars_limit,
+        fxs_offset,
+        fxs_limit,
+        bis_offset,
+        bis_limit,
+        recent_months,
+    )
     meta["generated_bar_counts"] = counts
-    return {"symbol": symbol, "sdt": sdt, "edt": edt, "base_freq": base_freq, "items": items, "meta": meta}
+
+    # 确保 items 只包含 targets 中的周期（数据一致性保证）
+    filtered_items = {k: v for k, v in items.items() if k in targets}
+    if len(filtered_items) != len(items):
+        logger.warning(
+            f"本地CZSC数据过滤: {symbol} 过滤前周期={list(items.keys())} 过滤后周期={list(filtered_items.keys())} 目标周期={targets}"
+        )
+
+    # 构建分页元数据
+    pagination = {}
+    for freq_key, item_data in filtered_items.items():
+        freq_pagination = {}
+        if "bars" in item_data:
+            bars_total = item_data.get("_bars_total", len(item_data["bars"]))
+            bars_returned = len(item_data["bars"])
+            freq_pagination["bars"] = {
+                "total": bars_total,
+                "offset": bars_offset,
+                "limit": bars_limit if bars_limit > 0 else bars_total,
+                "returned": bars_returned,
+                "has_more": bars_limit > 0 and (bars_offset + bars_returned) < bars_total,
+            }
+        if "fxs" in item_data:
+            fxs_total = item_data.get("_fxs_total", len(item_data["fxs"]))
+            fxs_returned = len(item_data["fxs"])
+            freq_pagination["fxs"] = {
+                "total": fxs_total,
+                "offset": fxs_offset,
+                "limit": fxs_limit if fxs_limit > 0 else fxs_total,
+                "returned": fxs_returned,
+                "has_more": fxs_limit > 0 and (fxs_offset + fxs_returned) < fxs_total,
+            }
+        if "bis" in item_data:
+            bis_total = item_data.get("_bis_total", len(item_data["bis"]))
+            bis_returned = len(item_data["bis"])
+            freq_pagination["bis"] = {
+                "total": bis_total,
+                "offset": bis_offset,
+                "limit": bis_limit if bis_limit > 0 else bis_total,
+                "returned": bis_returned,
+                "has_more": bis_limit > 0 and (bis_offset + bis_returned) < bis_total,
+            }
+        if freq_pagination:
+            pagination[freq_key] = freq_pagination
+        # 清理临时字段
+        item_data.pop("_bars_total", None)
+        item_data.pop("_fxs_total", None)
+        item_data.pop("_bis_total", None)
+
+    logger.info(
+        f"本地CZSC分析完成: {symbol} 返回周期={list(filtered_items.keys())} 目标周期={targets} | {sdt} ~ {edt} "
+        f"分页信息={pagination}"
+    )
+    return {
+        "symbol": symbol,
+        "sdt": sdt,
+        "edt": edt,
+        "base_freq": base_freq,
+        "items": filtered_items,
+        "meta": meta,
+        "pagination": pagination,
+    }
 

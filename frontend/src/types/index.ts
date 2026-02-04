@@ -19,16 +19,22 @@ export interface BI {
   symbol: string;
   sdt: string;
   edt: string;
-  direction: '向上' | '向下';
+  direction: string; // '向上' | '向下'
   high: number;
   low: number;
   power: number;
+  fx_a_dt?: string;
+  fx_a_fx?: number;
+  fx_a_mark?: string;
+  fx_b_dt?: string;
+  fx_b_fx?: number;
+  fx_b_mark?: string;
 }
 
 export interface FX {
   symbol: string;
   dt: string;
-  mark: '顶分型' | '底分型';
+  mark: string; // '顶分型' | '底分型'
   high: number;
   low: number;
   fx: number;

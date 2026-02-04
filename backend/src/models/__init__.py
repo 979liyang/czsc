@@ -7,11 +7,16 @@ from .schemas import (
     AnalysisRequest, AnalysisResponse,
     SignalRequest, SignalResponse, BatchSignalRequest,
     BacktestRequest, BacktestResponse,
+    SymbolItem, SymbolListResponse,
     ErrorResponse
 )
 from .serializers import (
     serialize_raw_bar, serialize_bi, serialize_fx, serialize_zs, serialize_signal,
     serialize_raw_bars, serialize_bis, serialize_fxs, serialize_zss
+)
+from .schemas_data_quality import (
+    CoverageItem, DailyStatItem, GapRange, GapQueryResult,
+    CoverageListResponse, DailyStatsResponse,
 )
 
 __all__ = [
@@ -20,7 +25,10 @@ __all__ = [
     'AnalysisRequest', 'AnalysisResponse',
     'SignalRequest', 'SignalResponse', 'BatchSignalRequest',
     'BacktestRequest', 'BacktestResponse',
+    'SymbolItem', 'SymbolListResponse',
     'ErrorResponse',
+    'CoverageItem', 'DailyStatItem', 'GapRange', 'GapQueryResult',
+    'CoverageListResponse', 'DailyStatsResponse',
     'serialize_raw_bar', 'serialize_bi', 'serialize_fx', 'serialize_zs', 'serialize_signal',
     'serialize_raw_bars', 'serialize_bis', 'serialize_fxs', 'serialize_zss',
 ]

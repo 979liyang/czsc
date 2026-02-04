@@ -4,7 +4,7 @@
       <p>{{ emptyText }}</p>
     </div>
     <TradingVue
-      v-else
+      v-else-if="tvData"
       :data="tvData"
       :overlays="customOverlays"
       :width="width"
@@ -104,12 +104,14 @@ const buildBiSpline = () => {
 const buildSmaIndicators = () => {
   const sma = props.item?.indicators?.sma || {};
   const colors: Record<string, string> = { MA5: '#42b28a', MA13: '#5691ce', MA21: '#612ff9' };
-  return Object.keys(sma).map((k) => ({
-    name: k,
-    type: 'SMA',
-    data: sma[k],
-    settings: { color: colors[k] || '#42b28a', lineWidth: 1.0, skipNaN: true },
-  }));
+  return Object.keys(sma)
+    .filter((k) => sma[k] && Array.isArray(sma[k]) && sma[k].length > 0)
+    .map((k) => ({
+      name: k,
+      type: 'SMA',
+      data: sma[k],
+      settings: { color: colors[k] || '#42b28a', lineWidth: 1.0, skipNaN: true },
+    }));
 };
 
 const tvData = computed(() => {
@@ -121,7 +123,10 @@ const tvData = computed(() => {
   }
 
   const onchart: any[] = [];
-  onchart.push(...buildSmaIndicators());
+  const smaIndicators = buildSmaIndicators();
+  if (smaIndicators.length > 0) {
+    onchart.push(...smaIndicators);
+  }
 
   const biPts = buildBiSpline();
   if (biPts.length) {
@@ -144,16 +149,20 @@ const tvData = computed(() => {
   }
 
   const offchart: any[] = [];
-  offchart.push({ name: 'Volume', type: 'Volume', data: ohlcv, settings: {} });
-  const macd = props.item?.indicators?.macd || [];
-  if (macd.length) {
-    offchart.push({ name: 'MACD', type: 'MACD', data: macd, settings: {} });
+  if (ohlcv.length > 0) {
+    offchart.push({ name: 'Volume', type: 'Volume', data: ohlcv, settings: {} });
   }
+  // 暂时注释掉 MACD，因为 customOverlays 可能有问题
+  // const macd = props.item?.indicators?.macd || [];
+  // if (macd.length && Array.isArray(macd)) {
+  //   offchart.push({ name: 'MACD', type: 'MACD', data: macd, settings: {} });
+  // }
 
   if (import.meta.env.DEV) {
     const key = `tv_dbg_${props.item?.freq || 'unknown'}`;
     if (key !== lastEmptyDebugKey) {
       lastEmptyDebugKey = key;
+      const macd = props.item?.indicators?.macd || [];
       console.debug('[KlineChartTradingVue] to_echarts 对齐检查', {
         freq: props.item?.freq,
         bars_count: ohlcv.length,
@@ -165,14 +174,33 @@ const tvData = computed(() => {
     }
   }
 
-  return {
+  // 确保所有数据都是有效的
+  if (!ohlcv || ohlcv.length === 0) {
+    return null;
+  }
+
+  const chartData = {
     chart: { type: 'Candles', data: ohlcv, settings: { showVolume: false } },
-    onchart,
-    offchart,
+    onchart: onchart || [],
+    offchart: offchart || [],
   };
+
+  // 开发环境调试
+  if (import.meta.env.DEV) {
+    console.debug('[KlineChartTradingVue] 构建的数据结构', {
+      chart: chartData.chart.type,
+      chartDataLength: chartData.chart.data.length,
+      onchartCount: chartData.onchart.length,
+      offchartCount: chartData.offchart.length,
+    });
+  }
+
+  return chartData;
 });
 
-const customOverlays = [MacdOverlay];
+// 暂时注释掉 customOverlays，看看是否是导致错误的原因
+// const customOverlays = MacdOverlay ? [MacdOverlay] : [];
+const customOverlays: any[] = [];
 
 onMounted(() => {
   if (!wrapRef.value) return;

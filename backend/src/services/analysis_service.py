@@ -52,6 +52,10 @@ class AnalysisService:
             'bis': serialize_bis(czsc.bi_list),
             'fxs': serialize_fxs(czsc.fx_list),
             'zss': [],  # 中枢需要单独计算，暂时返回空列表
+            # 数据可用范围（先用本次实际 bars 的范围，后续可替换为本地全量覆盖范围）
+            'data_start_dt': bars[0].dt.isoformat() if bars else None,
+            'data_end_dt': bars[-1].dt.isoformat() if bars else None,
+            'gaps_summary': None,
         }
 
         # 计算统计信息（类似 demo/analyze.py）

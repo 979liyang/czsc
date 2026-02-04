@@ -34,4 +34,9 @@ export const routes: RouteRecordRaw[] = [
     name: 'StockDetail',
     component: () => import('../views/StockDetail.vue'),
   },
+  {
+    path: '/data-quality',
+    name: 'DataQuality',
+    component: () => import('../views/DataQuality.vue'),
+  },
 ];

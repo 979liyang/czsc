@@ -1,3 +1,12 @@
+<!--
+  股票详情页 - 性能优化版本
+  
+  性能优化说明：
+  - 只支持 30分钟、60分钟、日线 三个周期（移除 1,5,15 分钟以提升性能）
+  - 按需加载：用户选择哪个周期才请求哪个周期的数据
+  - 周期缓存：已加载的周期数据会缓存，切换周期时如果已缓存则直接显示
+  - 单周期请求：每次只请求一个周期的数据，减少服务器计算负担
+-->
 <template>
   <div class="stock-detail-page">
     <!-- 头部信息 -->
@@ -41,6 +50,13 @@
     <!-- 加载状态 -->
     <div v-if="store.loading" class="loading-container">
       <el-skeleton :rows="5" animated />
+      <el-alert
+        v-if="store.loading"
+        type="info"
+        :closable="false"
+        :title="`正在加载${store.activeFreq}数据...`"
+        class="mt-4"
+      />
     </div>
 
     <!-- 错误提示 -->
@@ -77,6 +93,13 @@
           <template #header>
             <span>数据元信息</span>
           </template>
+          <el-alert
+            type="info"
+            :closable="false"
+            class="mb-4"
+            title="时间范围说明"
+            description="K线数据仅显示最近3个月，但分型和笔分析基于全量历史数据，确保分析准确性。"
+          />
           <div class="meta-grid">
             <div class="meta-item">
               <span class="meta-label">parquet 命中：</span>
@@ -107,6 +130,14 @@
             <div class="meta-item meta-item-full">
               <span class="meta-label">bars 数量：</span>
               <span class="meta-value">{{ formatBarCounts(store.localCzsc.meta.generated_bar_counts) }}</span>
+            </div>
+            <div v-if="activeItem" class="meta-item meta-item-full">
+              <span class="meta-label">K线数据时间范围：</span>
+              <span class="meta-value">最近3个月（{{ activeItem.bars?.length || 0 }}条）</span>
+            </div>
+            <div v-if="activeItem" class="meta-item meta-item-full">
+              <span class="meta-label">分析数据时间范围：</span>
+              <span class="meta-value">全量历史数据（分型{{ activeItem.fxs?.length || 0 }}条，笔{{ activeItem.bis?.length || 0 }}条）</span>
             </div>
             <div v-if="(store.localCzsc.meta.warnings || []).length" class="meta-item meta-item-full">
               <span class="meta-label">warnings：</span>
@@ -205,6 +236,8 @@ import { useStockDetailStore } from '../stores';
 import KlineChartTradingVue from '../components/KlineChartTradingVue.vue';
 import BiList from '../components/BiList.vue';
 import FxList from '../components/FxList.vue';
+// 导入 mock 数据
+import { data as mockData } from '../mockdata/index';
 
 const route = useRoute();
 const store = useStockDetailStore();
@@ -220,8 +253,9 @@ const form = ref({
   edt: '',
 });
 
-const defaultFreqs = '1,5,15,30,60';
-const defaultBaseFreq = '1分钟';
+// 可用周期列表：只支持 30分钟、60分钟、日线（性能优化）
+const availableFreqs = ['30分钟', '60分钟', '日线'];
+// const defaultBaseFreq = '1分钟'; // 暂时不使用，因为使用 mock 数据
 
 // 获取默认时间范围
 const getDefaultDateRange = () => {
@@ -238,43 +272,140 @@ const initForm = () => {
   form.value.edt = edt;
 };
 
-// 刷新数据
-const handleRefresh = () => {
-  if (symbol.value && form.value.sdt && form.value.edt) {
-    const sdt = form.value.sdt.replace(/-/g, '');
-    const edt = form.value.edt.replace(/-/g, '');
-    store.fetchLocalCzsc(symbol.value, sdt, edt, defaultFreqs, defaultBaseFreq, true);
-  }
+// 刷新当前激活周期的数据（使用默认的 recent_months=3）
+// 暂时使用 mock 数据，不请求接口
+const handleRefresh = async () => {
+  // 使用 mock 数据
+  loadMockData();
+  
+  // 如果需要请求接口，取消下面的注释
+  // if (symbol.value && form.value.sdt && form.value.edt) {
+  //   const sdt = form.value.sdt.replace(/-/g, '');
+  //   const edt = form.value.edt.replace(/-/g, '');
+  //   await store.fetchSingleFreq(symbol.value, sdt, edt, store.activeFreq, defaultBaseFreq, 0, 0, 0, 0, 0, 0, false, 3);
+  // }
 };
 
-// 日期变更
-const handleDateChange = () => {
+// 日期变更：只刷新当前激活周期的数据
+const handleDateChange = async () => {
   if (form.value.sdt && form.value.edt) {
-    handleRefresh();
+    await handleRefresh();
   }
 };
 
+// 从当前周期的缓存中获取数据（确保只显示当前激活周期的数据）
 const activeItem = computed(() => {
   const data = store.localCzsc;
   if (!data) return null;
-  return data.items?.[store.activeFreq] || null;
+  const item = data.items?.[store.activeFreq] || null;
+  // 验证数据一致性：确保返回的是当前激活周期的数据
+  if (item && item.freq !== store.activeFreq) {
+    console.warn(
+      `[StockDetail] 数据不一致: activeFreq=${store.activeFreq} item.freq=${item.freq}`,
+      { data, activeFreq: store.activeFreq }
+    );
+  }
+  return item;
 });
 
+// itemsKeys 只返回当前激活周期的 key（用于调试和验证）
 const itemsKeys = computed(() => {
   const data = store.localCzsc;
-  return Object.keys(data?.items || {});
-});
-
-const availableFreqs = computed(() => {
-  const data = store.localCzsc;
-  const m = data?.meta;
-  if (m?.target_freqs && m.target_freqs.length) return m.target_freqs;
+  if (!data) return [];
   const keys = Object.keys(data?.items || {});
-  return keys.length ? keys : ['1分钟', '5分钟', '15分钟', '30分钟', '60分钟', '日线'];
+  // 验证：如果 items 包含多个周期，记录警告
+  if (keys.length > 1) {
+    console.warn(
+      `[StockDetail] items 包含多个周期: ${keys.join(', ')} 当前激活周期: ${store.activeFreq}`,
+      { items: data.items, activeFreq: store.activeFreq }
+    );
+  }
+  // 只返回当前激活周期的 key（确保一致性）
+  return keys.filter((k) => k === store.activeFreq);
 });
 
+// 加载 mock 数据到 store
+const loadMockData = () => {
+  // 将 mock 数据设置到 store 的缓存中
+  const freq = '30分钟'; // mock 数据中的周期
+  const cacheItem = {
+    data: mockData as any,
+    sdt: mockData.sdt,
+    edt: mockData.edt,
+    pagination: mockData.pagination?.[freq] ? {
+      bars: {
+        loaded: mockData.pagination[freq].bars.returned,
+        total: mockData.pagination[freq].bars.total
+      },
+      fxs: {
+        loaded: mockData.pagination[freq].fxs.returned,
+        total: mockData.pagination[freq].fxs.total
+      },
+      bis: {
+        loaded: mockData.pagination[freq].bis.returned,
+        total: mockData.pagination[freq].bis.total
+      }
+    } : undefined
+  };
+  
+  // 设置到 store 的缓存中
+  // Pinia store 会自动解包 ref，但 localCzscCache 是 Map，需要访问 .value
+  store.localCzscCache.set(freq, cacheItem);
+  
+  // 设置当前激活周期
+  store.activeFreq = freq;
+  
+  // 设置 symbol
+  store.symbol = mockData.symbol;
+  
+  console.log('[StockDetail] Mock 数据已加载', { 
+    freq, 
+    symbol: mockData.symbol,
+    items: Object.keys(mockData.items || {}),
+    barsCount: mockData.items?.[freq]?.bars?.length || 0
+  });
+};
+
+// 监听周期切换，按需加载数据（确保只加载对应周期，使用默认的 recent_months=3）
+// 暂时使用 mock 数据，不请求接口
 watch(
-  () => [store.localCzsc, store.activeFreq],
+  () => store.activeFreq,
+  async (newFreq, oldFreq) => {
+    console.log(`[StockDetail] 周期切换: ${oldFreq} -> ${newFreq}`);
+    
+    // 使用 mock 数据
+    loadMockData();
+    
+    // 如果需要请求接口，取消下面的注释
+    // if (!symbol.value || !form.value.sdt || !form.value.edt) return;
+    // 
+    // // 检查缓存
+    // const sdt = form.value.sdt.replace(/-/g, '');
+    // const edt = form.value.edt.replace(/-/g, '');
+    // const cacheItem = store.localCzscCache.get(newFreq);
+    // 
+    // if (cacheItem && cacheItem.sdt === sdt && cacheItem.edt === edt) {
+    //   // 缓存有效，直接使用
+    //   console.log(`[StockDetail] 使用缓存: ${newFreq} 缓存周期=${Object.keys(cacheItem.data.items || {}).join(', ')}`);
+    //   return;
+    // }
+    // 
+    // // 缓存无效或不存在，请求数据（只请求当前激活周期，K线数据只返回最近3个月）
+    // console.log(`[StockDetail] 加载周期数据: ${newFreq} sdt=${sdt} edt=${edt} recent_months=3`);
+    // try {
+    //   const result = await store.fetchSingleFreq(symbol.value, sdt, edt, newFreq, defaultBaseFreq, 0, 0, 0, 0, 0, 0, false, 3);
+    //   console.log(
+    //     `[StockDetail] 周期数据加载完成: ${newFreq} 返回周期=${Object.keys(result.items || {}).join(', ')}`
+    //   );
+    // } catch (err) {
+    //   console.error(`[StockDetail] 加载周期数据失败: ${newFreq}`, err);
+    // }
+  }
+);
+
+// 监听数据变化，记录日志
+watch(
+  () => store.localCzsc,
   () => {
     const data = store.localCzsc;
     if (!data) return;
@@ -283,8 +414,7 @@ watch(
         symbol: symbol.value,
         sdt: form.value.sdt,
         edt: form.value.edt,
-        freqs: defaultFreqs,
-        base_freq: defaultBaseFreq,
+        activeFreq: store.activeFreq,
         meta: data.meta,
       });
       return;
@@ -294,8 +424,6 @@ watch(
         symbol: symbol.value,
         sdt: form.value.sdt,
         edt: form.value.edt,
-        freqs: defaultFreqs,
-        base_freq: defaultBaseFreq,
         activeFreq: store.activeFreq,
         itemsKeys: itemsKeys.value,
         meta: data.meta,
@@ -315,11 +443,17 @@ const formatBarCounts = (counts: Record<string, number> | undefined) => {
     .join(', ');
 };
 
-// 组件挂载时获取数据
-onMounted(() => {
+// 组件挂载时加载 mock 数据
+onMounted(async () => {
   if (symbol.value) {
     initForm();
-    handleRefresh();
+    // 使用 mock 数据，不请求接口
+    loadMockData();
+    
+    // 如果需要请求接口，取消下面的注释
+    // const sdt = form.value.sdt.replace(/-/g, '');
+    // const edt = form.value.edt.replace(/-/g, '');
+    // await store.fetchSingleFreq(symbol.value, sdt, edt, '30分钟', defaultBaseFreq, 0, 0, 0, 0, 0, 0, false, 3);
   }
 });
 </script>

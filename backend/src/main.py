@@ -102,7 +102,7 @@ async def health():
 
 
 # 导入API路由
-from .api.v1 import analysis, bars, signals, backtest, symbols, docs, examples, data_management
+from .api.v1 import analysis, bars, signals, backtest, symbols, docs, examples, data_management, data_quality
 app.include_router(analysis.router, prefix="/api/v1", tags=["缠论分析"])
 app.include_router(bars.router, prefix="/api/v1", tags=["K线数据"])
 app.include_router(signals.router, prefix="/api/v1", tags=["信号计算"])
@@ -111,6 +111,7 @@ app.include_router(symbols.router, prefix="/api/v1", tags=["股票列表"])
 app.include_router(docs.router, prefix="/api/v1", tags=["信号函数文档"])
 app.include_router(examples.router, prefix="/api/v1", tags=["策略示例"])
 app.include_router(data_management.router, prefix="/api/v1", tags=["数据管理"])
+app.include_router(data_quality.router, prefix="/api/v1", tags=["数据质量"])
 
 
 if __name__ == "__main__":

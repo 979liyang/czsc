@@ -51,6 +51,22 @@
     </div>
 
     <div v-if="store.hasResult" class="result-container">
+      <el-card v-if="store.analysisResult?.data_start_dt || store.analysisResult?.data_end_dt" style="margin-bottom: 20px">
+        <template #header>
+          <span>数据范围提示</span>
+        </template>
+        <div class="text-sm text-gray-600">
+          <div v-if="store.analysisResult?.data_start_dt">
+            实际数据开始时间：{{ store.analysisResult.data_start_dt }}
+          </div>
+          <div v-if="store.analysisResult?.data_end_dt">
+            实际数据结束时间：{{ store.analysisResult.data_end_dt }}
+          </div>
+          <div v-if="store.analysisResult?.gaps_summary" style="margin-top: 8px">
+            缺口摘要：{{ store.analysisResult.gaps_summary }}
+          </div>
+        </div>
+      </el-card>
       <el-row :gutter="20">
         <el-col :span="16">
           <el-card>

@@ -49,6 +49,10 @@ class AnalysisResponse(BaseModel):
     last_bi_extend: bool = Field(..., description="最后一笔是否在延伸")
     last_bi_direction: Optional[str] = Field(None, description="最后一笔方向")
     last_bi_power: Optional[float] = Field(None, description="最后一笔幅度")
+    # 数据可用范围与缺口摘要（可选，用于提示“本地数据不足/缺失”）
+    data_start_dt: Optional[str] = Field(None, description="本次分析实际使用数据的开始时间（ISO格式）")
+    data_end_dt: Optional[str] = Field(None, description="本次分析实际使用数据的结束时间（ISO格式）")
+    gaps_summary: Optional[str] = Field(None, description="缺口摘要（可选，后续由数据质量模块填充）")
 
 
 class LocalCzscItem(BaseModel):
@@ -82,6 +86,24 @@ class LocalCzscMeta(BaseModel):
     warnings: List[str] = Field(default_factory=list, description="校验/合成过程中的警告信息")
 
 
+class PaginationInfo(BaseModel):
+    """分页信息（单个数据类型的）"""
+
+    total: int = Field(..., description="总数据量")
+    offset: int = Field(..., description="当前偏移量（已跳过的数据量）")
+    limit: int = Field(..., description="每页数量（0 表示返回全部）")
+    returned: int = Field(..., description="本次返回的数据量")
+    has_more: bool = Field(..., description="是否还有更多数据")
+
+
+class FrequencyPagination(BaseModel):
+    """单个周期的分页信息"""
+
+    bars: Optional[PaginationInfo] = Field(None, description="K线数据分页信息")
+    fxs: Optional[PaginationInfo] = Field(None, description="分型数据分页信息")
+    bis: Optional[PaginationInfo] = Field(None, description="笔数据分页信息")
+
+
 class LocalCzscResponse(BaseModel):
     """本地分钟数据驱动的多周期 CZSC 分析响应"""
 
@@ -94,6 +116,9 @@ class LocalCzscResponse(BaseModel):
         description="key 为周期名称（与 LocalCzscItem.freq 一致），如 1分钟/5分钟/15分钟/30分钟/60分钟（可选日线）",
     )
     meta: Optional[LocalCzscMeta] = Field(None, description="数据加载/过滤/合成元数据")
+    pagination: Optional[Dict[str, FrequencyPagination]] = Field(
+        None, description="分页信息，key 为周期名称，value 为该周期的分页信息"
+    )
 
 
 class SignalRequest(BaseModel):
@@ -131,6 +156,23 @@ class BacktestResponse(BaseModel):
     pairs: Dict[str, Any] = Field(..., description="回测结果对")
     operates: List[Dict[str, Any]] = Field(..., description="操作记录列表")
     positions: List[Dict[str, Any]] = Field(..., description="持仓记录列表")
+
+
+class SymbolItem(BaseModel):
+    """股票信息条目"""
+
+    symbol: str = Field(..., description="股票代码，如 000001.SZ / 600000.SH")
+    name: Optional[str] = Field(None, description="中文名称")
+    market: Optional[str] = Field(None, description="市场：SH / SZ")
+    list_date: Optional[str] = Field(None, description="上市日期 YYYYMMDD")
+    delist_date: Optional[str] = Field(None, description="退市日期 YYYYMMDD")
+
+
+class SymbolListResponse(BaseModel):
+    """股票列表响应"""
+
+    items: List[SymbolItem] = Field(default_factory=list, description="股票信息列表")
+    count: int = Field(..., description="数量")
 
 
 class ErrorResponse(BaseModel):

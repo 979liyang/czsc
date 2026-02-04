@@ -15,6 +15,9 @@
       <p class="signal-description">
         {{ truncateDescription(signal.description) }}
       </p>
+      <div v-if="signal.data_requirements" class="signal-req">
+        建议数据：{{ signal.data_requirements.freq }}，建议回看：{{ signal.data_requirements.needed_bars }} 根
+      </div>
       <div class="signal-meta">
         <span class="meta-item">
           <el-icon><Document /></el-icon>
@@ -107,6 +110,12 @@ const getCategoryType = (category: string): string => {
   line-height: 1.6;
   margin: 0 0 10px 0;
   min-height: 48px;
+}
+
+.signal-req {
+  margin: 6px 0 10px 0;
+  font-size: 12px;
+  color: #606266;
 }
 
 .signal-meta {
