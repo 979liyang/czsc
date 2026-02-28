@@ -66,7 +66,22 @@ python scripts/fetch_tushare_stock_basic.py --exchange SSE
 python scripts/fetch_tushare_stock_basic.py --exchange SZSE
 ```
 
-## 3. 更新策略建议
+## 4. 扩展字段（全量保存到 CSV 与 MySQL）
+
+`fetch_tushare_stock_basic.py` 支持拉取并保存**全量字段**：
+
+- **stock_basic**：symbol, name, market, list_date, delist_date, area, industry, fullname, enname, cnspell, exchange, curr_type, list_status, is_hs, act_name, act_ent_type
+- **daily_basic**（默认拉取最近交易日）：trade_date, close, turnover_rate, pe, pe_ttm, pb, ps, total_mv, circ_mv 等
+
+一键拉取并写入本地 CSV + MySQL：
+
+```bash
+python scripts/fetch_tushare_stock_basic.py --with-daily-basic --to-mysql
+```
+
+若 MySQL 表 `stock_basic` 为旧版（仅 5 列），需先做**表结构升级**（增加扩展列），再执行上述命令或 `stock_basic_import.py`。新部署可直接执行 `db_init_mysql.py` 建表（模型已含全字段）。
+
+## 5. 更新策略建议
 
 - **全量导入**：首次建设时，用一份尽可能完整的股票列表（含历史退市）
 - **增量更新**：每周或每月导入一次最新列表（upsert 会覆盖 name/market/list_date 等字段）

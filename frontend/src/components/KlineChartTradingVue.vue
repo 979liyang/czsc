@@ -1,11 +1,15 @@
+<!--
+  trading-vue-js 数据结构见: https://github.com/tvjsx/trading-vue-js/tree/master/docs/api#api-book
+  要求: chart (必填), onchart, offchart；chart.data 为 [ [timestamp, o, h, l, c, vol], ... ]
+-->
 <template>
   <div ref="wrapRef" class="kline-chart-tradingvue" style="width: 100%; height: 600px">
-    <div v-if="!tvData" class="empty-state">
+    <div v-if="!tvDataRef" class="empty-state">
       <p>{{ emptyText }}</p>
     </div>
     <TradingVue
-      v-else-if="tvData"
-      :data="tvData"
+      v-else
+      :data="tvDataRef"
       :overlays="customOverlays"
       :width="width"
       :height="height"
@@ -16,13 +20,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import TradingVue from 'trading-vue-js';
 import type { LocalCzscItemData, LocalCzscMetaData } from '../api/analysis';
-import MacdOverlay from './tv_overlays/MacdOverlay';
 
+/** 与 mock / 接口返回兼容：含 freq、bars、fxs、bis、indicators 等 */
 interface Props {
-  item: LocalCzscItemData;
+  item: LocalCzscItemData | null | undefined;
   meta?: LocalCzscMetaData;
 }
 
@@ -114,7 +118,8 @@ const buildSmaIndicators = () => {
     }));
 };
 
-const tvData = computed(() => {
+/** 构建符合 trading-vue-js API 的 data 对象，避免每次渲染新引用导致库内部报错 */
+function buildTvData(): Record<string, unknown> | null {
   updateEmptyText();
   const ohlcv = buildOhlcv();
   if (!ohlcv.length) {
@@ -124,9 +129,7 @@ const tvData = computed(() => {
 
   const onchart: any[] = [];
   const smaIndicators = buildSmaIndicators();
-  if (smaIndicators.length > 0) {
-    onchart.push(...smaIndicators);
-  }
+  if (smaIndicators.length > 0) onchart.push(...smaIndicators);
 
   const biPts = buildBiSpline();
   if (biPts.length) {
@@ -149,57 +152,38 @@ const tvData = computed(() => {
   }
 
   const offchart: any[] = [];
-  if (ohlcv.length > 0) {
-    offchart.push({ name: 'Volume', type: 'Volume', data: ohlcv, settings: {} });
-  }
-  // 暂时注释掉 MACD，因为 customOverlays 可能有问题
-  // const macd = props.item?.indicators?.macd || [];
-  // if (macd.length && Array.isArray(macd)) {
-  //   offchart.push({ name: 'MACD', type: 'MACD', data: macd, settings: {} });
-  // }
+  offchart.push({ name: 'Volume', type: 'Volume', data: ohlcv, settings: {} });
 
   if (import.meta.env.DEV) {
     const key = `tv_dbg_${props.item?.freq || 'unknown'}`;
     if (key !== lastEmptyDebugKey) {
       lastEmptyDebugKey = key;
-      const macd = props.item?.indicators?.macd || [];
-      console.debug('[KlineChartTradingVue] to_echarts 对齐检查', {
+      console.debug('[KlineChartTradingVue] tvData', {
         freq: props.item?.freq,
         bars_count: ohlcv.length,
-        sma_keys: Object.keys(props.item?.indicators?.sma || {}),
-        macd_len: macd.length,
-        fx_len: fxTrades.length,
-        bi_pts_len: biPts.length,
+        onchartCount: onchart.length,
+        offchartCount: offchart.length,
       });
     }
   }
 
-  // 确保所有数据都是有效的
-  if (!ohlcv || ohlcv.length === 0) {
-    return null;
-  }
-
-  const chartData = {
+  return {
     chart: { type: 'Candles', data: ohlcv, settings: { showVolume: false } },
-    onchart: onchart || [],
-    offchart: offchart || [],
+    onchart,
+    offchart,
   };
+}
 
-  // 开发环境调试
-  if (import.meta.env.DEV) {
-    console.debug('[KlineChartTradingVue] 构建的数据结构', {
-      chart: chartData.chart.type,
-      chartDataLength: chartData.chart.data.length,
-      onchartCount: chartData.onchart.length,
-      offchartCount: chartData.offchart.length,
-    });
-  }
+const tvDataRef = ref<Record<string, unknown> | null>(null);
 
-  return chartData;
-});
+watch(
+  () => props.item,
+  () => {
+    tvDataRef.value = buildTvData();
+  },
+  { immediate: true, deep: true }
+);
 
-// 暂时注释掉 customOverlays，看看是否是导致错误的原因
-// const customOverlays = MacdOverlay ? [MacdOverlay] : [];
 const customOverlays: any[] = [];
 
 onMounted(() => {
@@ -221,9 +205,7 @@ onBeforeUnmount(() => {
 
 watch(
   () => props.meta,
-  () => {
-    updateEmptyText();
-  },
+  () => updateEmptyText(),
   { deep: true }
 );
 </script>

@@ -87,25 +87,27 @@ class PartitionPathGenerator:
         data_type: str,
         stock_code: str,
         year: Optional[int] = None,
-        month: Optional[int] = None
+        month: Optional[int] = None,
+        minute_subdir: Optional[str] = None,
     ) -> Path:
         """
         生成按股票分区的路径
-        
+
         :param data_type: 数据类型（'minute', 'daily'）
         :param stock_code: 股票代码（如：000001.SZ）
         :param year: 年份（日线数据和分钟数据按股票分区时必需）
         :param month: 月份（可选，如果提供则生成月度文件路径）
+        :param minute_subdir: 分钟数据子目录，1min 用 minute_by_stock，60min 用 minute_60_by_stock，默认 minute_by_stock
         :return: 分区路径
         """
         if data_type == "minute":
             # 分钟数据按股票分区需要year参数
             if year is None:
                 raise ValueError("分钟数据按股票分区需要提供year参数")
-            
-            # 按股票分区：raw/minute_by_stock/stock_code={stock_code}/year={year}/
+            subdir = minute_subdir if minute_subdir else "minute_by_stock"
+            # 按股票分区：raw/minute_by_stock 或 raw/minute_60_by_stock
             path = (
-                self.base_path / "raw" / "minute_by_stock" /
+                self.base_path / "raw" / subdir /
                 f"stock_code={stock_code}" /
                 f"year={year}"
             )
@@ -117,28 +119,35 @@ class PartitionPathGenerator:
             
             return path
         elif data_type == "daily":
-            # 按股票分区（新格式，按年份分区）：
-            # raw/daily/by_stock/stock_code={stock_code}/year={year}/stock_code={stock_code}_{year}.parquet
+            # 按股票分区：stock_code 目录下直接按年存 parquet，无 year 子目录
+            # raw/daily/by_stock/stock_code={stock_code}/{stock_code}_{year}.parquet
             if year is None:
-                raise ValueError("日线数据按股票分区需要提供year参数（新格式按年份分区）")
-            
-            # 新格式：按年份分区
-            path = (
-                self.base_path / "raw" / "daily" / "by_stock" /
-                f"stock_code={stock_code}" /
-                f"year={year}"
-            )
-            
-            # 如果提供了月份，返回月度文件路径（可选功能）
-            if month is not None:
-                file_name = f"stock_code={stock_code}_{year}-{month:02d}.parquet"
-                return path / file_name
-            
-            # 默认返回年度文件路径
-            file_name = f"stock_code={stock_code}_{year}.parquet"
+                raise ValueError("日线数据按股票分区需要提供year参数")
+            path = self.base_path / "raw" / "daily" / "by_stock" / f"stock_code={stock_code}"
+            file_name = f"{stock_code}_{year}.parquet"
             return path / file_name
         else:
             raise ValueError(f"不支持的数据类型: {data_type}")
+
+    def generate_index_partition_path(
+        self,
+        data_type: str,
+        index_code: str,
+        year: int,
+    ) -> Path:
+        """
+        生成按指数分区的日线路径（raw/daily/by_index）
+
+        :param data_type: 数据类型（仅支持 'daily'）
+        :param index_code: 指数代码（如 000001.SH）
+        :param year: 年份
+        :return: 文件路径 raw/daily/by_index/index_code=xxx/xxx_2015.parquet
+        """
+        if data_type != "daily":
+            raise ValueError("按指数分区仅支持日线 daily")
+        path = self.base_path / "raw" / "daily" / "by_index" / f"index_code={index_code}"
+        file_name = f"{index_code}_{year}.parquet"
+        return path / file_name
     
     def get_file_path(
         self,
@@ -165,7 +174,8 @@ class PartitionPathGenerator:
             stock_code = kwargs.get('stock_code')
             year = kwargs.get('year')
             month = kwargs.get('month')
-            
+            minute_subdir = kwargs.get('minute_subdir')
+
             # 日线数据按股票分区（新格式按年份分区，year 必填）
             if data_type == "daily":
                 if stock_code is None:
@@ -177,6 +187,14 @@ class PartitionPathGenerator:
                 # 分钟数据按股票分区需要year参数
                 if stock_code is None or year is None:
                     raise ValueError("按股票分区需要提供stock_code和year参数")
-                return self.generate_stock_partition_path(data_type, stock_code, year, month)
+                return self.generate_stock_partition_path(
+                    data_type, stock_code, year, month, minute_subdir=minute_subdir
+                )
+        elif partition_strategy == "by_index":
+            index_code = kwargs.get('index_code')
+            year = kwargs.get('year')
+            if data_type != "daily" or index_code is None or year is None:
+                raise ValueError("按指数分区需要 data_type=daily 且提供 index_code 和 year 参数")
+            return self.generate_index_partition_path(data_type, index_code, year)
         else:
             raise ValueError(f"不支持的分区策略: {partition_strategy}")

@@ -37,13 +37,17 @@ def _default_stock_data_root() -> Path:
 
 
 def _normalize_symbol(symbol: str) -> str:
-    """标准化股票代码格式（仅用于 demo：600078 -> 600078.SH）"""
+    """标准化股票代码格式（仅用于 demo：600078 -> 600078.SH，300308.S -> 300308.SZ）"""
     s = str(symbol).strip().upper()
     # 兼容路由形式：SH600078 / SZ000001
     if s.startswith("SH") and len(s) == 8 and s[2:].isdigit():
         return f"{s[2:]}.SH"
     if s.startswith("SZ") and len(s) == 8 and s[2:].isdigit():
         return f"{s[2:]}.SZ"
+    # 补全不完整后缀：300308.S -> 300308.SZ，600078.S -> 600078.SH
+    if s.endswith(".S") and len(s) > 3 and s[:-2].isdigit():
+        code = s[:-2]
+        return f"{code}.SH" if code.startswith("6") else f"{code}.SZ"
     if "." in s:
         return s
     if s.startswith("6"):
@@ -72,6 +76,55 @@ def _minute_files(base_path: Path, symbol: str, y: int, m: int) -> Path:
     """按约定生成月度 parquet 文件路径"""
     p = base_path / "raw" / "minute_by_stock" / f"stock_code={symbol}" / f"year={y}"
     return p / f"{symbol}_{y}-{m:02d}.parquet"
+
+
+def _daily_dir(base_path: Path, symbol: str) -> Path:
+    """按约定生成日线 by_stock 目录路径"""
+    return base_path / "raw" / "daily" / "by_stock" / f"stock_code={symbol}"
+
+
+def _load_daily_df_by_stock(base_path: Path, symbol: str, sdt: pd.Timestamp, edt: pd.Timestamp) -> pd.DataFrame:
+    """从 `.stock_data/raw/daily/by_stock` 读取日线数据（若不存在则返回空 DataFrame）。"""
+    root = _daily_dir(base_path, symbol)
+    if not root.exists():
+        return pd.DataFrame()
+    dfs: List[pd.DataFrame] = []
+    for fp in sorted(root.glob("*.parquet")):
+        try:
+            df = pd.read_parquet(fp)
+            if df is not None and len(df) > 0:
+                dfs.append(df)
+        except Exception:
+            continue
+    if not dfs:
+        return pd.DataFrame()
+    kline = pd.concat(dfs, ignore_index=True)
+    date_col = "date" if "date" in kline.columns else ("trade_date" if "trade_date" in kline.columns else "dt")
+    if date_col not in kline.columns:
+        return pd.DataFrame()
+    kline["dt"] = pd.to_datetime(kline[date_col])
+    kline = kline[(kline["dt"] >= sdt) & (kline["dt"] <= edt)].copy()
+    if kline.empty:
+        return pd.DataFrame()
+    kline["symbol"] = kline["stock_code"] if "stock_code" in kline.columns else symbol
+    kline["vol"] = kline["volume"] if "volume" in kline.columns else kline.get("vol", 0)
+    cols = ["symbol", "dt", "open", "close", "high", "low", "vol", "amount"]
+    for c in cols:
+        if c not in kline.columns:
+            kline[c] = 0
+    return kline[cols].sort_values("dt").reset_index(drop=True)
+
+
+def _resample_ohlcv_df(df: pd.DataFrame, rule: str) -> pd.DataFrame:
+    """pandas OHLCV 重采样（周/月），用于 TradingView 等场景。"""
+    if df is None or len(df) == 0:
+        return pd.DataFrame()
+    x = df.copy()
+    x = x.set_index(pd.to_datetime(x["dt"]))
+    agg = {"open": "first", "high": "max", "low": "min", "close": "last", "vol": "sum", "amount": "sum"}
+    out = x.resample(rule).agg(agg).dropna().reset_index().rename(columns={"index": "dt"})
+    out["symbol"] = df["symbol"].iloc[0]
+    return out[["symbol", "dt", "open", "close", "high", "low", "vol", "amount"]]
 
 
 def _normalize_freqs(freqs: Optional[str]) -> str:
@@ -249,20 +302,28 @@ def _df_to_raw_bars(df: pd.DataFrame, freq_value: str) -> List[RawBar]:
     return bars
 
 
-def _build_base_bars(minute_bars: List[RawBar], base_freq: str) -> List[RawBar]:
-    """从 1分钟 bars 合成 base_freq bars（若 base_freq=1分钟，则直接返回）"""
+def _build_base_bars(
+    minute_bars: List[RawBar], base_freq: str, market: str = "A股"
+) -> List[RawBar]:
+    """从 1分钟 bars 合成 base_freq bars（若 base_freq=1分钟，则直接返回）。
+
+    market 用于 BarGenerator 的时间分段：A股 使用 9:30-10:30/10:30-11:30/13:00-14:00/14:00-15:00，
+    否则 60 分钟等周期的开盘/收盘会错位。
+    """
     if base_freq == "1分钟":
         return minute_bars
-    bg = BarGenerator(base_freq="1分钟", freqs=[base_freq])
+    bg = BarGenerator(base_freq="1分钟", freqs=[base_freq], market=market)
     for bar in minute_bars:
         bg.update(bar)
     return bg.bars.get(base_freq, [])
 
 
-def _build_multi_freq_bars(base_bars: List[RawBar], base_freq: str, targets: List[str]) -> Dict[str, List[RawBar]]:
-    """用 BarGenerator 从 base_bars 合成 targets 周期 bars（targets 包含 base 也没问题）"""
+def _build_multi_freq_bars(
+    base_bars: List[RawBar], base_freq: str, targets: List[str], market: str = "A股"
+) -> Dict[str, List[RawBar]]:
+    """用 BarGenerator 从 base_bars 合成 targets 周期 bars（targets 包含 base 也没问题）。"""
     freqs = [f for f in targets if f != base_freq]
-    bg = BarGenerator(base_freq=base_freq, freqs=freqs)
+    bg = BarGenerator(base_freq=base_freq, freqs=freqs, market=market)
     for bar in base_bars:
         bg.update(bar)
     out: Dict[str, List[RawBar]] = {base_freq: bg.bars.get(base_freq, []) or base_bars}

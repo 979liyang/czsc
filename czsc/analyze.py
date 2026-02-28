@@ -13,6 +13,7 @@ from collections import OrderedDict
 from czsc.enum import Mark, Direction
 from czsc.objects import BI, FX, RawBar, NewBar
 from czsc.utils.echarts_plot import kline_pro
+from czsc.utils.sig import get_zs_seq
 from czsc import envs
 
 logger.disable('czsc.analyze')
@@ -325,12 +326,13 @@ class CZSC:
         # 如果有信号计算函数，则进行信号计算
         self.signals = self.get_signals(c=self) if self.get_signals else OrderedDict()
 
-    def to_echarts(self, width: str = "1400px", height: str = '580px', bs=[]):
+    def to_echarts(self, width: str = "1400px", height: str = '580px', bs=[], draw_zs: bool = False):
         """绘制K线分析图
 
         :param width: 宽
         :param height: 高
         :param bs: 交易标记，默认为空
+        :param draw_zs: 是否绘制中枢矩形（由已完成的笔计算中枢）
         :return:
         """
         kline = [x.__dict__ for x in self.bars_raw]
@@ -341,8 +343,14 @@ class CZSC:
         else:
             bi = []
             fx = []
-        chart = kline_pro(kline, bi=bi, fx=fx, width=width, height=height, bs=bs,
-                          title="{}-{}".format(self.symbol, self.freq.value))
+        zs = []
+        if draw_zs and len(self.finished_bis) >= 3:
+            zs_list = get_zs_seq(self.finished_bis)
+            zs = [z for z in zs_list if len(z.bis) >= 3 and z.is_valid]
+        chart = kline_pro(
+            kline, bi=bi, fx=fx, zs=zs, width=width, height=height, bs=bs,
+            title="{}-{}".format(self.symbol, self.freq.value),
+        )
         return chart
 
     def to_plotly(self):

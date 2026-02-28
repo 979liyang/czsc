@@ -29,6 +29,10 @@ loguru>=0.7.0
 httpx>=0.25.0
 requests>=2.31.0
 
+# 认证（直接使用 bcrypt，避免 passlib 与 bcrypt 4.1+ 不兼容）
+bcrypt>=4.0.0
+python-jose[cryptography]>=3.3.0
+
 # 工具
 python-dateutil>=2.8.0
 pytz>=2023.3

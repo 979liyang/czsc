@@ -11,6 +11,7 @@ import glob
 import pandas as pd
 
 # 投研共享数据的本地缓存路径，需要根据实际情况修改
+print('==========')
 cache_path = r"D:\CZSC投研数据"
 
 

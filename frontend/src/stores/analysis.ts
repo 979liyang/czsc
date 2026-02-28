@@ -1,5 +1,5 @@
 /**
- * 缠论分析状态管理
+ * 麒麟分析状态管理
  */
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
@@ -21,6 +21,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
   async function analyze(symbol: string, freq: string, sdt: string, edt: string) {
     loading.value = true;
     error.value = null;
+    analysisResult.value = null;
 
     try {
       const result = await analysisApi.analyze({ symbol, freq, sdt, edt });

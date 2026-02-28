@@ -13,19 +13,22 @@ strategies/
 
 ## 股票策略
 
-### strategy_01_third_buy.py
-- **名称**: 日线三买多头策略
-- **说明**: 基于缠论三买信号的股票多头策略
-- **周期**: 日线、30分钟
-- **文档**: [strategy_01_third_buy_README.md](stock/strategy_01_third_buy_README.md)
+- **strategy_01_third_buy**: 日线三买多头策略
+- **strategy_02_ma_long**: 日线均线多头策略
+- **strategy_03_15min_bi**: 15分钟笔结构策略
+- **strategy_04_60min_trend**: 60分钟趋势跟踪
 
 ## 期货策略
 
-### strategy_01_30min_bi.py
-- **名称**: 30分钟笔非多即空策略
-- **说明**: 基于30分钟笔方向的期货多空策略
-- **周期**: 30分钟
-- **文档**: [strategy_01_30min_bi_README.md](future/strategy_01_30min_bi_README.md)
+- **strategy_01_30min_bi**: 30分钟笔非多即空策略
+- **strategy_02_5min_bi**: 5分钟笔非多即空策略
+- **strategy_03_60min_trend**: 60分钟期货趋势
+
+## ETF 策略
+
+- **strategy_01_etf_third_buy**: ETF 日线三买
+- **strategy_02_etf_ma**: ETF 均线择时
+- **strategy_03_etf_bi**: ETF 笔结构
 
 ## 使用方法
 

@@ -1,0 +1,49 @@
+{
+  "name": "日线笔非多即空",
+  "opens": [
+    {
+      "name": "开多#28FB",
+      "operate": "开多",
+      "signals_all": [],
+      "signals_any": [],
+      "signals_not": [],
+      "factors": [
+        {
+          "name": "#4465",
+          "signals_all": [
+            "日线_D1_表里关系V230101_向上_任意_任意_0"
+          ],
+          "signals_any": [],
+          "signals_not": [
+            "日线_D1_涨跌停V230331_涨停_任意_任意_0"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "开空#BCD6",
+      "operate": "开空",
+      "signals_all": [],
+      "signals_any": [],
+      "signals_not": [],
+      "factors": [
+        {
+          "name": "#8215",
+          "signals_all": [
+            "日线_D1_表里关系V230101_向下_任意_任意_0"
+          ],
+          "signals_any": [],
+          "signals_not": [
+            "日线_D1_涨跌停V230331_跌停_任意_任意_0"
+          ]
+        }
+      ]
+    }
+  ],
+  "exits": [],
+  "interval": 14400,
+  "timeout": 480,
+  "stop_loss": 500,
+  "T0": false,
+  "md5": "4a241ddfd8aa45ef0e1aa00f3eaa7102"
+}

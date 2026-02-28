@@ -1,6 +1,6 @@
 # CZSC 前端应用
 
-基于Vue3 + ElementPlus + TailwindCSS的CZSC缠论分析前端界面。
+基于Vue3 + ElementPlus + TailwindCSS的Kylin Trading Pro分析前端界面。
 
 ## 技术栈
 
@@ -48,6 +48,16 @@ npm run dev
 ```
 
 访问 http://localhost:5173
+
+## 麒麟图表分析 Demo（与参考 HTML 完全一致，数据同源）
+
+页面 `/demo-czsc-analyze` 与 `.results/czsc_chart_analyze_01_000001.SH_20260209_104835.html`（000001.SH 上证指数）**完全一致**：内容、技术栈、样式及**图表数据**均与该参考 HTML 一致。
+
+- **技术栈**: ECharts 5（与 pyecharts 使用的 echarts.min.js v5 一致）、Vue 3、TypeScript；初始化方式与参考一致（canvas、locale ZH）
+- **图表**: K 线、MA5/MA13/MA21、分型(FX)、笔(BI)、成交量、MACD/DIFF/DEA；容器 1400×580，背景 #1f212d
+- **数据来源**: 从该参考 HTML 内嵌的 ECharts option 解析并导出为 `frontend/public/czsc_chart_000001_SH_option.json`，本页加载该 JSON 后直接 `setOption(option)`，实现数据与参考页同源。若未导出 JSON，页面会提示执行：`python scripts/extract_echarts_option_from_html.py`（详见仓库根目录 `scripts/README.md`）
+
+访问：`http://localhost:5173/demo-czsc-analyze`
 
 ## 股票详情页（本地 .stock_data 数据）
 

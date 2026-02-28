@@ -5,7 +5,7 @@ Pydantic数据模型
 定义API请求和响应的数据模型。
 """
 from datetime import datetime
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Literal
 from pydantic import BaseModel, Field
 
 
@@ -52,6 +52,11 @@ class AnalysisResponse(BaseModel):
     # 数据可用范围与缺口摘要（可选，用于提示“本地数据不足/缺失”）
     data_start_dt: Optional[str] = Field(None, description="本次分析实际使用数据的开始时间（ISO格式）")
     data_end_dt: Optional[str] = Field(None, description="本次分析实际使用数据的结束时间（ISO格式）")
+    requested_sdt: Optional[str] = Field(None, description="本次请求的开始时间（与入参 sdt 一致）")
+    requested_edt: Optional[str] = Field(None, description="本次请求的结束时间（与入参 edt 一致）")
+    effective_sdt: Optional[str] = Field(None, description="本次分析实际使用的开始日期（YYYY-MM-DD），与 data_start_dt 日期部分一致")
+    effective_edt: Optional[str] = Field(None, description="本次分析实际使用的结束日期（YYYY-MM-DD），与 data_end_dt 日期部分一致")
+    data_range_note: Optional[str] = Field(None, description="当实际数据未覆盖请求区间时的说明")
     gaps_summary: Optional[str] = Field(None, description="缺口摘要（可选，后续由数据质量模块填充）")
 
 
@@ -156,6 +161,20 @@ class BacktestResponse(BaseModel):
     pairs: Dict[str, Any] = Field(..., description="回测结果对")
     operates: List[Dict[str, Any]] = Field(..., description="操作记录列表")
     positions: List[Dict[str, Any]] = Field(..., description="持仓记录列表")
+    positions_summary: Optional[List[Dict[str, Any]]] = Field(
+        None,
+        description="按持仓汇总：pos_name、operate_count、last_operates、evaluate（run-by-strategy 返回）",
+    )
+
+
+class BacktestByStrategyRequest(BaseModel):
+    """按策略库执行回测请求：策略 id/name、标的、日期、参数覆盖"""
+    strategy_id: Optional[int] = Field(None, description="策略库 id")
+    strategy_name: Optional[str] = Field(None, description="策略库 name（与 strategy_id 二选一）")
+    symbol: str = Field(..., description="标的代码")
+    sdt: str = Field(..., description="开始时间 YYYYMMDD 或 YYYY-MM-DD")
+    edt: str = Field(..., description="结束时间 YYYYMMDD 或 YYYY-MM-DD")
+    params: Optional[Dict[str, Any]] = Field(None, description="策略参数覆盖，与 params_schema 默认值合并")
 
 
 class SymbolItem(BaseModel):
@@ -179,3 +198,118 @@ class ErrorResponse(BaseModel):
     """错误响应模型"""
     error: str = Field(..., description="错误信息")
     detail: Optional[str] = Field(None, description="错误详情")
+
+
+# ---------- 认证 ----------
+class LoginRequest(BaseModel):
+    """登录请求"""
+    username: str = Field(..., min_length=1, max_length=64)
+    password: str = Field(..., min_length=1, max_length=72)
+
+
+class RegisterRequest(BaseModel):
+    """注册请求"""
+    username: str = Field(..., min_length=1, max_length=64)
+    password: str = Field(..., min_length=6, max_length=72)
+
+
+class UserResponse(BaseModel):
+    """用户信息（响应）"""
+    id: int
+    username: str
+    nickname: Optional[str] = None
+    signature: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    points: int = 0
+    role: str = "user"
+    tier_name: Optional[str] = None
+    feature_flags: List[str] = Field(default_factory=list)
+
+    class Config:
+        from_attributes = True
+
+
+class UserProfileUpdate(BaseModel):
+    """用户资料更新（可选字段）"""
+    nickname: Optional[str] = Field(None, max_length=64)
+    signature: Optional[str] = Field(None, max_length=255)
+    phone: Optional[str] = Field(None, max_length=32)
+    email: Optional[str] = Field(None, max_length=128)
+
+
+class MySinglesItem(BaseModel):
+    """my_singles 收藏项"""
+    id: int
+    item_type: str
+    item_id: str
+    sort_order: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+class MySinglesAdd(BaseModel):
+    """添加 my_singles 请求"""
+    item_type: str = Field(..., description="signal / symbol")
+    item_id: str = Field(..., min_length=1, max_length=128)
+    sort_order: int = 0
+
+
+class MySinglesResponse(BaseModel):
+    """my_singles 列表响应"""
+    items: List[MySinglesItem] = Field(default_factory=list)
+
+
+class LoginResponse(BaseModel):
+    """登录成功响应"""
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+
+# ---------- 自选股 ----------
+class WatchlistAdd(BaseModel):
+    """添加自选股请求"""
+    symbol: str = Field(..., min_length=1, max_length=32)
+
+
+class WatchlistItem(BaseModel):
+    """自选股单项（含富化字段：名称、最新价、涨跌、涨跌%）"""
+    symbol: str
+    sort_order: int = 0
+    name: Optional[str] = None
+    latest_price: Optional[float] = None
+    change: Optional[float] = None
+    change_pct: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+
+class WatchlistResponse(BaseModel):
+    """自选股列表响应"""
+    items: List[WatchlistItem] = Field(default_factory=list)
+
+
+# ---------- 数据拉取运行记录 ----------
+class DataFetchTriggerRequest(BaseModel):
+    """触发数据拉取请求"""
+    task_type: Literal["daily", "minute", "index"] = Field(
+        ..., description="任务类型：daily 日线 / minute 分钟 / index 指数"
+    )
+
+
+class DataFetchRunResponse(BaseModel):
+    """数据拉取运行记录响应"""
+    id: int
+    task_type: str
+    run_at: datetime
+    trigger: str
+    status: str
+    summary: Optional[str] = None
+    params_json: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

@@ -1150,3 +1150,62 @@ def create_third_sell_short(symbol, is_stocks=False, **kwargs) -> Position:
         T0=T0,
     )
     return pos
+
+
+def create_long_short_bi(symbol, is_stocks=True, **kwargs) -> Position:
+    """笔非多即空策略（表里关系向上开多、向下开空，排除涨跌停）
+
+    源自 examples/30分钟笔非多即空.py 的 create_long_short_V230909。
+    使用信号：表里关系V230101、涨跌停V230331。
+
+    :param symbol: 标的代码
+    :param is_stocks: 是否 A 股（开多排除涨停、开空排除跌停）
+    :param kwargs: freq（笔周期，默认 30分钟）、interval、timeout、stop_loss 等
+    :return: Position
+    """
+    freq = kwargs.get("freq", "30分钟")
+    interval = int(kwargs.get("interval", 3600 * 4))
+    timeout = int(kwargs.get("timeout", 16 * 30))
+    stop_loss = int(kwargs.get("stop_loss", 500))
+
+    opens = [
+        {
+            "operate": "开多",
+            "signals_all": [],
+            "signals_any": [],
+            "signals_not": [],
+            "factors": [
+                {
+                    "signals_all": [f"{freq}_D1_表里关系V230101_向上_任意_任意_0"],
+                    "signals_any": [],
+                    "signals_not": [f"{freq}_D1_涨跌停V230331_涨停_任意_任意_0"] if is_stocks else [],
+                }
+            ],
+        },
+        {
+            "operate": "开空",
+            "signals_all": [],
+            "signals_any": [],
+            "signals_not": [],
+            "factors": [
+                {
+                    "signals_all": [f"{freq}_D1_表里关系V230101_向下_任意_任意_0"],
+                    "signals_any": [],
+                    "signals_not": [f"{freq}_D1_涨跌停V230331_跌停_任意_任意_0"] if is_stocks else [],
+                }
+            ],
+        },
+    ]
+
+    exits = []
+
+    pos = Position(
+        name=f"{freq}笔非多即空",
+        symbol=symbol,
+        opens=[Event.load(x) for x in opens],
+        exits=[Event.load(x) for x in exits],
+        interval=interval,
+        timeout=timeout,
+        stop_loss=stop_loss,
+    )
+    return pos

@@ -5,12 +5,20 @@
 封装缠论分析业务逻辑。
 """
 from typing import Dict, Any
+import pandas as pd
 from loguru import logger
 from czsc.analyze import CZSC
 from czsc.objects import RawBar
 
 from ..utils import CZSCAdapter
 from ..models.serializers import serialize_bis, serialize_fxs, serialize_zss
+
+
+def _date_str(dt) -> str:
+    """将 datetime 转为 YYYY-MM-DD 字符串便于展示"""
+    if hasattr(dt, "strftime"):
+        return dt.strftime("%Y-%m-%d")
+    return str(dt)[:10]
 
 
 class AnalysisService:
@@ -55,8 +63,27 @@ class AnalysisService:
             # 数据可用范围（先用本次实际 bars 的范围，后续可替换为本地全量覆盖范围）
             'data_start_dt': bars[0].dt.isoformat() if bars else None,
             'data_end_dt': bars[-1].dt.isoformat() if bars else None,
+            'requested_sdt': sdt,
+            'requested_edt': edt,
+            # 实际使用范围（YYYY-MM-DD），便于前端展示「实际使用范围」与 data_range_note 一致
+            'effective_sdt': _date_str(bars[0].dt) if bars else None,
+            'effective_edt': _date_str(bars[-1].dt) if bars else None,
             'gaps_summary': None,
         }
+
+        # 当实际数据未覆盖请求区间时，生成说明（便于用户理解“为啥实际开始不是 sdt”）
+        if bars:
+            req_start = pd.to_datetime(sdt).date()
+            req_end = pd.to_datetime(edt).date()
+            actual_start = bars[0].dt.date() if hasattr(bars[0].dt, "date") else pd.to_datetime(bars[0].dt).date()
+            actual_end = bars[-1].dt.date() if hasattr(bars[-1].dt, "date") else pd.to_datetime(bars[-1].dt).date()
+            notes = []
+            if actual_start > req_start:
+                notes.append(f"请求开始时间为 {sdt}，但数据源中该标的最早数据为 {_date_str(bars[0].dt)}，分析基于实际可用数据。")
+            if actual_end < req_end:
+                notes.append(f"请求结束时间为 {edt}，但数据源中最晚数据为 {_date_str(bars[-1].dt)}。")
+            if notes:
+                result['data_range_note'] = " ".join(notes)
 
         # 计算统计信息（类似 demo/analyze.py）
         result['bars_raw_count'] = len(czsc.bars_raw)

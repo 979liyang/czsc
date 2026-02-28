@@ -46,6 +46,14 @@ class Settings(BaseSettings):
     # ---------- 基础 ----------
     timezone: str = "Asia/Shanghai"
 
+    # ---------- 数据路径（K线、元数据、缓存） ----------
+    data_path: str = "data"
+    klines_path: str = "data/klines"
+    metadata_path: str = "data/metadata"
+    cache_path: str = "data/cache"
+    # 策略示例目录（与 API 层 EXAMPLES_PATH 一致，默认 examples；其下 strategies/ 放 strategy_*.py）
+    examples_path: str = "examples"
+
     # ---------- MySQL 连接 ----------
     mysql_host: str = "127.0.0.1"
     mysql_port: int = 3306
@@ -56,10 +64,29 @@ class Settings(BaseSettings):
 
     # ---------- 数据表名（可按需自定义） ----------
     table_stock_basic: str = "stock_basic"
+    table_index_info: str = "index_info"
     table_minute_bar: str = "stock_minute_bars"
     table_minute_coverage: str = "stock_minute_coverage"
     table_minute_daily_stats: str = "stock_minute_daily_stats"
     table_minute_gaps: str = "stock_minute_gaps"
+    table_user: str = "user"
+    table_watchlist: str = "watchlist"
+    table_signals: str = "signals"
+    table_signals_config: str = "signals_config"
+    table_factors: str = "factors"
+    table_screen_task_run: str = "screen_task_run"
+    table_screen_result: str = "screen_result"
+    table_data_fetch_run: str = "data_fetch_run"
+    table_points_tier: str = "points_tier"
+    table_special_permission: str = "special_permission"
+    table_user_special_permission: str = "user_special_permission"
+    table_my_singles: str = "my_singles"
+    table_strategies: str = "strategies"
+
+    # ---------- 认证（JWT） ----------
+    jwt_secret: str = "czsc-api-secret-change-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60 * 24 * 7  # 7 天
 
     # ---------- 交易时段（A股默认） ----------
     # 说明：用于“期望分钟数”估算与缺口检查。格式为 HH:MM

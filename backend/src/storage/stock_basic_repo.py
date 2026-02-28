@@ -33,25 +33,47 @@ class StockBasicRepo:
 
         return self.session.get(StockBasic, symbol)
 
-    def upsert_one(self, symbol: str, name: Optional[str] = None, market: Optional[str] = None, **kwargs) -> None:
-        """单条 upsert"""
+    def _row_to_float(self, v: Any) -> Optional[float]:
+        """将 CSV/字典中的值转为 float，空字符串或无效为 None"""
+        if v is None or (isinstance(v, str) and v.strip() == ""):
+            return None
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
+
+    def upsert_one(self, symbol: str, **kwargs: Any) -> None:
+        """单条 upsert，kwargs 中与模型同名的键会写入数据库"""
 
         obj = self.get(symbol)
         if obj is None:
             obj = StockBasic(symbol=symbol)
             self.session.add(obj)
 
-        obj.name = name if name is not None else obj.name
-        obj.market = market if market is not None else obj.market
-        obj.list_date = kwargs.get("list_date", obj.list_date)
-        obj.delist_date = kwargs.get("delist_date", obj.delist_date)
+        # 数值型列（从 CSV 读入为字符串需转 float）
+        float_keys = {
+            "close", "turnover_rate", "turnover_rate_f", "volume_ratio",
+            "pe", "pe_ttm", "pb", "ps", "ps_ttm", "dv_ratio", "dv_ttm",
+            "total_share", "float_share", "free_share", "total_mv", "circ_mv",
+        }
+        col_names = {c.key for c in StockBasic.__table__.columns if c.key not in ("created_at", "updated_at")}
+        for key, value in kwargs.items():
+            if key not in col_names or key == "symbol":
+                continue
+            if value is None or (isinstance(value, str) and value.strip() == ""):
+                setattr(obj, key, None)
+                continue
+            if key in float_keys:
+                setattr(obj, key, self._row_to_float(value))
+            else:
+                setattr(obj, key, value if not isinstance(value, str) else value.strip())
         obj.updated_at = datetime.now()
 
     def bulk_upsert(self, rows: Iterable[Dict[str, Any]]) -> int:
         """
-        批量 upsert
+        批量 upsert，支持全量字段（symbol 必填，其余按 CSV/接口列写入）。
 
-        :param rows: 每行至少包含 symbol，可选包含 name/market/list_date/delist_date
+        :param rows: 每行至少包含 symbol，可含 name/market/list_date/delist_date 及扩展列
         :return: 处理行数
         """
 
@@ -60,13 +82,7 @@ class StockBasicRepo:
             symbol = (r.get("symbol") or "").strip()
             if not symbol:
                 continue
-            self.upsert_one(
-                symbol=symbol,
-                name=(r.get("name") or None),
-                market=(r.get("market") or None),
-                list_date=(r.get("list_date") or None),
-                delist_date=(r.get("delist_date") or None),
-            )
+            self.upsert_one(symbol=symbol, **{k: v for k, v in r.items() if k != "symbol"})
             n += 1
 
         logger.info(f"stock_basic 批量 upsert 完成：rows={n}")

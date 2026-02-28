@@ -22,6 +22,7 @@ if str(project_root) not in sys.path:
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 # 配置日志
@@ -50,6 +51,23 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# 静态资源：TradingView Charting Library
+# 说明：为避免在前端项目中复制大量 `frontend/charting_library` 文件，这里由后端直接静态托管，
+# 前端通过 Vite proxy 访问 `/charting_library/*`。
+try:
+    charting_library_dir = project_root / "frontend" / "charting_library"
+    if charting_library_dir.exists():
+        app.mount(
+            "/charting_library",
+            StaticFiles(directory=str(charting_library_dir)),
+            name="charting_library",
+        )
+        logger.info(f"已挂载 charting_library 静态目录: {charting_library_dir}")
+    else:
+        logger.warning(f"未找到 charting_library 目录，跳过挂载: {charting_library_dir}")
+except Exception as e:
+    logger.warning(f"挂载 charting_library 静态目录失败: {e}")
 
 # 配置CORS
 app.add_middleware(
@@ -102,7 +120,10 @@ async def health():
 
 
 # 导入API路由
-from .api.v1 import analysis, bars, signals, backtest, symbols, docs, examples, data_management, data_quality
+from .api.v1 import analysis, bars, signals, backtest, symbols, docs, examples, data_management, data_quality, tradingview, indicators, auth, watchlist, my_singles, signals_config, factor_defs, strategies, screen, data_fetch
+app.include_router(auth.router, prefix="/api/v1")
+app.include_router(watchlist.router, prefix="/api/v1")
+app.include_router(my_singles.router, prefix="/api/v1")
 app.include_router(analysis.router, prefix="/api/v1", tags=["缠论分析"])
 app.include_router(bars.router, prefix="/api/v1", tags=["K线数据"])
 app.include_router(signals.router, prefix="/api/v1", tags=["信号计算"])
@@ -112,6 +133,13 @@ app.include_router(docs.router, prefix="/api/v1", tags=["信号函数文档"])
 app.include_router(examples.router, prefix="/api/v1", tags=["策略示例"])
 app.include_router(data_management.router, prefix="/api/v1", tags=["数据管理"])
 app.include_router(data_quality.router, prefix="/api/v1", tags=["数据质量"])
+app.include_router(tradingview.router, prefix="/api/v1", tags=["TradingView"])
+app.include_router(indicators.router, prefix="/api/v1", tags=["指标"])
+app.include_router(signals_config.router, prefix="/api/v1", tags=["信号配置"])
+app.include_router(factor_defs.router, prefix="/api/v1", tags=["因子库"])
+app.include_router(strategies.router, prefix="/api/v1", tags=["策略库"])
+app.include_router(screen.router, prefix="/api/v1", tags=["筛选任务"])
+app.include_router(data_fetch.router, prefix="/api/v1")
 
 
 if __name__ == "__main__":

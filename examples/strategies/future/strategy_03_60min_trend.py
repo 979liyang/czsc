@@ -1,0 +1,29 @@
+# -*- coding: utf-8 -*-
+"""
+策略示例3：60分钟期货趋势
+
+策略逻辑：60分钟级别期货趋势跟踪。
+
+适用市场：期货
+适用周期：60分钟
+"""
+from typing import List
+from czsc.objects import Position
+from czsc import CzscStrategyBase
+
+
+class Strategy(CzscStrategyBase):
+    """60分钟期货趋势（示例骨架）"""
+
+    @property
+    def positions(self) -> List[Position]:
+        """持仓策略列表"""
+        return []
+
+
+if __name__ == "__main__":
+    from czsc.connectors.research import get_raw_bars
+
+    tactic = Strategy(symbol="IF888")
+    bars = get_raw_bars("IF888", freq="60分钟", sdt="2021-01-01", edt="2024-01-01")
+    print("示例策略")

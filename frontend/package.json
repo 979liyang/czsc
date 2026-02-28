@@ -1,7 +1,7 @@
 {
   "name": "czsc-frontend",
   "version": "1.0.0",
-  "description": "CZSC缠论分析前端应用",
+  "description": "Kylin Trading Pro分析前端应用",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,8 +13,10 @@
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",
     "axios": "^1.6.0",
+    "dayjs": "^1.11.19",
     "echarts": "^5.4.3",
     "element-plus": "^2.4.2",
+    "pinets": "^0.8.10",
     "pinia": "^2.1.7",
     "trading-vue-js": "^1.0.2",
     "vue": "^3.3.4",

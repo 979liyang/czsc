@@ -156,3 +156,5 @@ Thumbs.db
 .vscode/
 .vscode/*
 .stock_data/
+
+frontend/charting_library/bundles/*

@@ -54,7 +54,7 @@ const truncateDescription = (desc: string, maxLength: number = 100): string => {
 
 const getCategoryType = (category: string): string => {
   const typeMap: Record<string, string> = {
-    '缠论类': 'danger',
+    '麒麟类': 'danger',
     '技术指标类': 'success',
     'K线形态类': 'warning',
     '成交量类': 'info',

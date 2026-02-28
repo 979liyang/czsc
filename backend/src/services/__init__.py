@@ -9,6 +9,9 @@ from .doc_service import DocService
 from .example_service import ExampleService
 from .symbol_service import SymbolService
 from .data_quality_service import DataQualityService
+from .permission_service import PermissionService
+
+from .permission_service import PermissionService
 
 __all__ = [
     'AnalysisService',
@@ -19,4 +22,5 @@ __all__ = [
     'ExampleService',
     'SymbolService',
     'DataQualityService',
+    'PermissionService',
 ]

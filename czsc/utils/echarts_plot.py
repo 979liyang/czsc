@@ -22,6 +22,7 @@ def kline_pro(
     bi: List[dict] = [],
     xd: List[dict] = [],
     bs: List[dict] = [],
+    zs: List = [],
     title: str = "缠中说禅K线分析",
     t_seq: List[int] = [],
     width: str = "1400px",
@@ -41,6 +42,7 @@ def kline_pro(
           'bi': 138.0}
     :param xd: 线段识别结果
     :param bs: 买卖点
+    :param zs: 中枢列表，每项为 dict(sdt, edt, zg, zd) 或具同名属性的对象
     :param title: 图表标题
     :param t_seq: 均线系统
     :param width: 图表宽度
@@ -173,6 +175,34 @@ def kline_pro(
         title_opts=title_opts,
         xaxis_opts=grid0_xaxis_opts,
     )
+
+    # 中枢矩形：在 K 线图上用 markArea 画出 zg/zd 区间（上沿 zg、下沿 zd）
+    if zs and dts:
+        def _zs_item(z):
+            if isinstance(z, dict):
+                return (z["sdt"], z["edt"], float(z["zg"]), float(z["zd"]))
+            return (z.sdt, z.edt, float(z.zg), float(z.zd))
+
+        zs_data = []
+        for z in zs:
+            sdt, edt, zg_val, zd_val = _zs_item(z)
+            i0 = next((i for i, d in enumerate(dts) if d >= sdt), 0)
+            i1 = next((i for i in range(len(dts) - 1, -1, -1) if dts[i] <= edt), len(dts) - 1)
+            if i0 > i1:
+                i0, i1 = 0, len(dts) - 1
+            zs_data.append([
+                {"name": "中枢", "xAxis": dts[i0], "yAxis": round(zd_val, 2)},
+                {"xAxis": dts[i1], "yAxis": round(zg_val, 2)},
+            ])
+        if zs_data:
+            chart_k.set_series_opts(
+                markarea_opts=opts.MarkAreaOpts(
+                    data=zs_data,
+                    itemstyle_opts=opts.ItemStyleOpts(
+                        color="rgba(0, 170, 59, 0.15)", border_color="#00aa3b", border_width=1
+                    ),
+                )
+            )
 
     # 加入买卖点 - 多头操作 - 空头操作
     if bs:

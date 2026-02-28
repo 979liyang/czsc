@@ -4,6 +4,8 @@
 
 本文档记录czsc.signals模块中所有信号函数的分类、签名、参数和返回值格式。
 
+**延伸阅读**：因子与策略在 CZSC 及本项目中的对应关系见 [czsc_factors_and_strategies.md](./czsc_factors_and_strategies.md)。
+
 ## 信号函数分类
 
 根据czsc.signals.__init__.py，信号函数按功能分为以下类别：
@@ -221,3 +223,19 @@ def get_signal_info(signal_func):
 2. **信号值格式**: v1_v2_v3_score格式，score取值0~100
 3. **参数验证**: 信号函数内部应验证参数有效性
 4. **缓存利用**: 充分利用cat.cache缓存计算结果
+
+## 本项目 API 与信号入参/返回
+
+### GET /docs/signals 与 GET /docs/signals/{name}
+
+- **category**：信号分类（cxt、tas、bar、vol 等），用于前端按类型筛选与展示。
+- **params**：信号函数参数列表，每项含 name、type、description、default、required，对应 kwargs（如 freq、di、ma_type、timeperiod）。
+- **data_requirements**：经验性数据需求，含 **freq**（建议周期，如「日线」「1分钟」）、**needed_bars**（约需 K 线根数），供前端作为该信号的默认周期参考。
+- **signals**：从 docstring 中解析出的 Signal('...') 列表，即该函数返回的 signal 键名格式说明。
+
+### POST /signals/batch
+
+- **请求体**：symbol、**freq**（本批次统一周期）、signal_configs、sdt、edt。  
+- **signal_configs** 每项：**name**（信号函数名，如 czsc.signals.xxx 或短名）、**freq**（可选，若与顶层 freq 一致可省略）、**di**（可选，默认 1）、以及该信号特有参数（如 ma_type、timeperiod）。  
+- **说明**：当前接口一次请求只支持一个 freq；若需「每信号不同周期」，前端可按周期分组后多次调用 batch，再合并返回的 signals 字典。
+- **返回**：**signals** 字典，key 为各信号产出的键名（如 `日线_D1_xxx_任意_任意_0`），value 为信号值字符串。
