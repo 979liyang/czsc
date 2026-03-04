@@ -15,48 +15,6 @@
         />
       </div>
       <aside class="panel w-[320px] shrink-0 overflow-y-auto bg-[#262a35] border-l border-[#363a45] p-4">
-        <h2 class="text-white font-semibold text-base mb-4">图形参数调整</h2>
-        <p class="text-[#9ca3af] text-xs mb-4">
-          修改下方参数后图表会实时重绘，用于调试 CZSC/SMC 等叠加样式。
-        </p>
-
-        <!-- 可绘制图形一览（来自 tv_overrides.md + README-shapes.md） -->
-        <details class="mb-6 rounded border border-[#363a45] overflow-hidden">
-          <summary class="px-3 py-2 bg-[#1f212d] text-[#e5e7eb] text-sm cursor-pointer select-none">
-            可绘制图形一览（TradingView API）
-          </summary>
-          <div class="px-3 py-2 text-xs text-[#9ca3af] space-y-2 bg-[#1f212d]/80">
-            <p class="font-medium text-[#d1d5db]">数据源标记（datafeed-api.d.ts）</p>
-            <p>datafeed 不提供 createShape/createMultipointShape，仅提供两类标记：<strong>getMarks</strong> 返回 <code class="text-[#60a5fa]">Mark[]</code>（K 线柱标记）、<strong>getTimescaleMarks</strong> 返回 <code class="text-[#60a5fa]">TimescaleMark[]</code>（时间轴标记）。需在 DatafeedConfiguration 中设置 <code class="text-[#60a5fa]">supports_marks</code> / <code class="text-[#60a5fa]">supports_timescale_marks</code> 为 true。</p>
-            <p>Mark 字段：id, time, color, text, label, labelFontColor, minSize, borderWidth, imageUrl 等。TimescaleMark 字段：id, time, color, labelFontColor, label, tooltip, shape, imageUrl 等。TimeScaleMarkShape 枚举：circle, earningUp, earningDown, earning。</p>
-            <p class="font-medium text-[#d1d5db]">createShape（单点）</p>
-            <p>arrow_up, arrow_down, flag, vertical_line, horizontal_line, long_position, short_position, icon, emoji, sticker, text, anchored_text, note, anchored_note。long_position/short_position 与 anchored_text/anchored_note 需 createAnchoredShape，本 Demo 仅做 createShape 单点类型。</p>
-            <p class="font-medium text-[#d1d5db]">createMultipointShape（多点）</p>
-            <p>trend_line, horizontal_ray, rectangle, triangle, circle, ellipse, arrow, ray, extended, polyline, path, curve, 以及 fib、pattern 等</p>
-            <p class="font-medium text-[#d1d5db]">属性 override</p>
-            <p>键名格式：<code class="text-[#60a5fa]">linetool&lt;工具名&gt;.&lt;属性&gt;</code>，完整列表见 <code class="text-[#60a5fa]">charting_library.d.ts</code>。</p>
-            <p class="font-medium text-[#d1d5db]">本页已按 d.ts 全属性对接的图形</p>
-            <p>text(linetooltext)、vertline(linetoolvertline)、circle(linetoolcircle)、triangle(linetooltriangle)、arrow(linetoolarrowmarkup/down)、矩形(linetoolrectangle)、水平射线(linetoolhorzray)、水平线(linetoolhorzline)、旗帜(linetoolflagmark) 等；对应 d.ts 接口见 README-shapes.md。未对接：createShape 之 icon、emoji、sticker、note；createMultipointShape 之 ellipse、ray、extended、polyline、path、curve；信号标记 price_label、arrow_marker、cross_line、signpost 等见 README-shapes.md §6.10。</p>
-          </div>
-        </details>
-
-        <!-- 所有图形 d.ts DrawingOverrides 全量列表 -->
-        <details class="mb-6 rounded border border-[#363a45] overflow-hidden">
-          <summary class="px-3 py-2 bg-[#1f212d] text-[#e5e7eb] text-sm cursor-pointer select-none">
-            所有图形（d.ts 全量 {{ ALL_LINETOOLS.length }} 个）
-          </summary>
-          <div class="px-3 py-2 text-xs bg-[#1f212d]/80 max-h-[280px] overflow-y-auto">
-            <p class="text-[#9ca3af] mb-2">DrawingOverrides 全部接口，override 键前缀见「linetoolxxx」</p>
-            <ul class="space-y-1 text-[#b0b5bb]">
-              <li v-for="t in ALL_LINETOOLS" :key="t.prefix" class="flex justify-between gap-2">
-                <span class="truncate">{{ t.name }}</span>
-                <code class="text-[#60a5fa] shrink-0">{{ t.prefix }}</code>
-              </li>
-            </ul>
-          </div>
-        </details>
-
-        <!-- 图形列表：默认只显示 title，点击展开当前并在 K 线图显示，其他收起且图上隐藏 -->
         <div
           v-for="s in SHAPE_SECTIONS"
           :key="s.key"
@@ -496,6 +454,61 @@
                 </div>
               </div>
             </template>
+            <!-- 看多/看空基类 -->
+            <template v-if="s.key === 'bullBear'">
+              <p class="text-[#6b7280] text-xs mb-2">看多：文案在连接线下方、红色；看空：文案在连接线上方、绿色。连接线距 K 线 0.2% 可调。</p>
+              <div class="space-y-2 text-sm">
+                <div class="flex items-center gap-2">
+                  <label class="w-28 text-[#9ca3af]">类型</label>
+                  <select v-model="cfg.bullBear.type" class="flex-1 rounded px-2 py-1 bg-[#1f212d] text-white text-xs">
+                    <option value="bullish">看多</option>
+                    <option value="bearish">看空</option>
+                  </select>
+                </div>
+                <div class="flex items-center gap-2">
+                  <label class="w-28 text-[#9ca3af]">文案</label>
+                  <input v-model="cfg.bullBear.text" type="text" placeholder="看多 / 看空"
+                    class="flex-1 min-w-0 rounded px-2 py-1 bg-[#1f212d] text-white text-xs" />
+                </div>
+                <div class="flex items-center gap-2">
+                  <label class="w-28 text-[#9ca3af]">连接线距离(%)</label>
+                  <input v-model.number="cfg.bullBear.lineGapPercent" type="number" min="0.05" max="5" step="0.05"
+                    class="w-16 rounded px-2 py-1 bg-[#1f212d] text-white" />
+                  <span class="text-[#6b7280] text-xs">距最低/最高 K 线</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <label class="w-28 text-[#9ca3af]">文案颜色</label>
+                  <input v-model="cfg.bullBear.textColor" type="color" class="w-10 h-6 rounded cursor-pointer" />
+                </div>
+                <div class="flex items-center gap-2">
+                  <label class="w-28 text-[#9ca3af]">连接线颜色</label>
+                  <input v-model="cfg.bullBear.lineColor" type="color" class="w-10 h-6 rounded cursor-pointer" />
+                </div>
+                <div class="flex items-center gap-2">
+                  <label class="w-28 text-[#9ca3af]">文案位置</label>
+                  <select v-model="cfg.bullBear.textPosition" class="flex-1 rounded px-2 py-1 bg-[#1f212d] text-white text-xs">
+                    <option value="below">连接线下方</option>
+                    <option value="above">连接线上方</option>
+                  </select>
+                </div>
+                <div class="flex items-center gap-2">
+                  <label class="w-28 text-[#9ca3af]">字号</label>
+                  <input v-model.number="cfg.bullBear.fontSize" type="number" min="8" max="24"
+                    class="w-16 rounded px-2 py-1 bg-[#1f212d] text-white" />
+                </div>
+                <button
+                  type="button"
+                  class="w-full py-2 rounded bg-[#22c55e] text-white text-sm hover:bg-[#16a34a]"
+                  @click="saveBullBearConfig"
+                >
+                  保存配置
+                </button>
+                <div v-if="savedBullBearJson" class="mt-2 p-2 rounded bg-[#1f212d] text-xs text-[#9ca3af] break-all">
+                  <p class="mb-1 font-medium text-[#e5e7eb]">已生成配置（可复制）：</p>
+                  <pre class="whitespace-pre-wrap">{{ savedBullBearJson }}</pre>
+                </div>
+              </div>
+            </template>
             <!-- 圆：仅边框与填充，无文字样式 -->
             <template v-if="s.key === 'circle'">
               <p class="text-[#6b7280] text-xs mb-2">仅边框与填充，无文字样式</p>
@@ -544,6 +557,11 @@ import { nextTick, reactive, ref, watch } from 'vue';
 import TradingViewWidget from '../components/TradingViewWidget.vue';
 import type { ChartShape, ChartPoint } from '../tv/chartShapes';
 import { drawChartShapes, clearChartShapes } from '../tv/chartShapes';
+import {
+  buildBullishShapes,
+  buildBearishShapes,
+  type BullBearFormConfig,
+} from '../tv/bullBearShapes';
 import { fetchBars } from '../tv/udfDatafeed';
 import type { Bar } from '../tv/udfDatafeed';
 
@@ -568,6 +586,7 @@ const SHAPE_SECTIONS = [
   { key: 'text', title: '单点文案 linetooltext' },
   { key: 'rect', title: '矩形 linetoolrectangle' },
   { key: 'ray', title: '水平线+文案 linetoolhorzray' },
+  { key: 'bullBear', title: '看多/看空基类' },
   { key: 'arrow', title: '箭头 linetoolarrowmarkup/down' },
   { key: 'triangle', title: '三角形 linetooltriangle' },
   { key: 'verticalLine', title: '竖线 linetoolvertline' },
@@ -584,6 +603,20 @@ function toggleShape(key: string) {
 let widgetRef: any = null;
 const entityIds = ref<string[]>([]);
 const demoBars = ref<Bar[]>([]);
+const savedBullBearJson = ref<string>('');
+
+function saveBullBearConfig() {
+  const c: BullBearFormConfig = {
+    type: cfg.bullBear.type,
+    text: cfg.bullBear.text,
+    lineGapPercent: cfg.bullBear.lineGapPercent,
+    textColor: cfg.bullBear.textColor,
+    lineColor: cfg.bullBear.lineColor,
+    textPosition: cfg.bullBear.textPosition,
+    fontSize: cfg.bullBear.fontSize,
+  };
+  savedBullBearJson.value = JSON.stringify(c, null, 2);
+}
 
 const cfg = reactive({
   text: {
@@ -683,6 +716,15 @@ const cfg = reactive({
   flag: {
     flagColor: '#2962FF',
     content: '旗标',
+  },
+  bullBear: {
+    type: 'bullish' as 'bullish' | 'bearish',
+    text: '看多',
+    lineGapPercent: 0.2,
+    textColor: '#CC2F3C',
+    lineColor: '#CC2F3C',
+    textPosition: 'below' as 'above' | 'below',
+    fontSize: 12,
   },
 });
 
@@ -876,6 +918,28 @@ function buildShapesFromPoints(
           }
         : undefined,
     });
+  }
+
+  if (key === 'bullBear' && bars && bars.length > 0) {
+    const daySec = 86400;
+    const midBar = bars[Math.floor(bars.length / 2)];
+    const anchor: ChartPoint = {
+      time: Math.floor(midBar.time / 1000),
+      price: cfg.bullBear.type === 'bullish' ? midBar.low : midBar.high,
+    };
+    const opts = {
+      lineGapPercent: cfg.bullBear.lineGapPercent,
+      textColor: cfg.bullBear.textColor,
+      lineColor: cfg.bullBear.lineColor,
+      fontSize: cfg.bullBear.fontSize,
+      lengthSeconds: 5 * daySec,
+    };
+    const labelText = cfg.bullBear.text || (cfg.bullBear.type === 'bullish' ? '看多' : '看空');
+    const bullOrBearShapes =
+      cfg.bullBear.type === 'bullish'
+        ? buildBullishShapes(anchor, labelText, opts)
+        : buildBearishShapes(anchor, labelText, opts);
+    shapes.push(...bullOrBearShapes);
   }
 
   if (key === 'arrow' && pMid) {

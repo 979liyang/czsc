@@ -58,6 +58,15 @@ class AnalysisResponse(BaseModel):
     effective_edt: Optional[str] = Field(None, description="本次分析实际使用的结束日期（YYYY-MM-DD），与 data_end_dt 日期部分一致")
     data_range_note: Optional[str] = Field(None, description="当实际数据未覆盖请求区间时的说明")
     gaps_summary: Optional[str] = Field(None, description="缺口摘要（可选，后续由数据质量模块填充）")
+    # 涨停、跌停与一二三类买卖点时间节点（可选，默认空列表）
+    limit_up_events: List[Dict[str, Any]] = Field(default_factory=list, description="涨停事件列表")
+    limit_down_events: List[Dict[str, Any]] = Field(default_factory=list, description="跌停事件列表")
+    buy1_events: List[Dict[str, Any]] = Field(default_factory=list, description="第一类买点时间节点列表")
+    buy2_events: List[Dict[str, Any]] = Field(default_factory=list, description="第二类买点时间节点列表")
+    buy3_events: List[Dict[str, Any]] = Field(default_factory=list, description="第三类买点时间节点列表")
+    sell1_events: List[Dict[str, Any]] = Field(default_factory=list, description="第一类卖点时间节点列表")
+    sell2_events: List[Dict[str, Any]] = Field(default_factory=list, description="第二类卖点时间节点列表")
+    sell3_events: List[Dict[str, Any]] = Field(default_factory=list, description="第三类卖点时间节点列表")
 
 
 class LocalCzscItem(BaseModel):

@@ -5,6 +5,7 @@
 与 CZSC 对应关系：
 - run_signal_screen：按 signals 表（信号库元数据）逐只、逐信号计算，对应 czsc 的「全量信号扫描」。
 - run_factor_screen：按 factors 表（因子库，signals_config 多条信号或 expression_or_signal_ref 单条）逐只、逐因子计算，对应 czsc 的「因子维度」筛选，结果带 factor_id。
+- run_bs1_screen：仅计算第一类买卖点（一买、一卖），结果写入 ScreenResult，task_type=bs1。
 """
 from __future__ import annotations
 
@@ -21,6 +22,7 @@ from ..storage.stock_basic_repo import StockBasicRepo
 from ..utils import CZSCAdapter
 from ..storage import KlineStorage
 from .signal_service import SignalService
+from .analysis_service import AnalysisService
 
 
 def _default_data_path() -> Path:
@@ -119,6 +121,75 @@ def run_signal_screen(
         return count
     except Exception as e:
         logger.exception(f"筛选任务失败: {e}")
+        task.status = "failed"
+        raise
+
+
+def run_bs1_screen(
+    session: Session,
+    trade_date: str,
+    market: Optional[str] = None,
+    analysis_service: Optional[AnalysisService] = None,
+    max_symbols: int = 0,
+) -> int:
+    """
+    执行第一类买卖点筛选：对股票池在 trade_date 仅计算一买、一卖，结果写入 ScreenResult。
+    task_type=bs1，signal_name="bs1"，value_result 为 {"buy1_events": [...], "sell1_events": [...]}。
+    """
+    task = ScreenTaskRun(
+        task_type="bs1",
+        run_at=datetime.now(),
+        status="running",
+        params_json=json.dumps({"trade_date": trade_date, "market": market or ""}),
+    )
+    session.add(task)
+    session.flush()
+    task_run_id = task.id
+    try:
+        symbols = StockBasicRepo(session).list_symbols(market=market)
+        if max_symbols > 0:
+            symbols = symbols[:max_symbols]
+        if not symbols:
+            logger.warning("股票池为空，跳过第一类买卖点筛选")
+            task.status = "success"
+            return 0
+        if analysis_service is None:
+            # 全盘扫描 BS1 统一从 czsc.connectors.research.get_raw_bars 获取日线（get_raw_bars_daily）
+            adapter = CZSCAdapter(kline_storage=None)
+            analysis_service = AnalysisService(czsc_adapter=adapter)
+        sdt = (
+            datetime.strptime(trade_date, "%Y%m%d") - timedelta(days=120)
+        ).strftime("%Y%m%d")
+        edt = trade_date
+        count = 0
+        for symbol in symbols:
+            try:
+                result = analysis_service.analyze(symbol, "日线", sdt, edt)
+            except (ValueError, Exception) as e:
+                logger.debug(f"第一类买卖点扫描跳过 {symbol}: {e}")
+                continue
+            buy1 = result.get("buy1_events") or []
+            sell1 = result.get("sell1_events") or []
+            if not buy1 and not sell1:
+                continue
+            row = ScreenResult(
+                task_run_id=task_run_id,
+                symbol=symbol,
+                signal_name="bs1",
+                factor_id=None,
+                trade_date=trade_date,
+                value_result=json.dumps(
+                    {"buy1_events": buy1, "sell1_events": sell1},
+                    ensure_ascii=False,
+                ),
+            )
+            session.add(row)
+            count += 1
+        task.status = "success"
+        logger.info(f"第一类买卖点筛选完成：task_run_id={task_run_id}，写入 {count} 条")
+        return count
+    except Exception as e:
+        logger.exception(f"第一类买卖点筛选失败: {e}")
         task.status = "failed"
         raise
 

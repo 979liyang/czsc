@@ -129,6 +129,66 @@
         <FxList :fxs="store.fxs" />
       </el-card>
       </div>
+
+      <!-- 涨停、跌停与买卖点时间节点表格 -->
+      <div class="flex gap-[16px] flex-wrap">
+        <el-card class="section-card event-table-card">
+          <template #header><span class="section-title">【涨停】</span></template>
+          <el-table :data="store.analysisResult?.limit_up_events ?? []" stripe size="small">
+            <el-table-column prop="dt" label="时间节点" min-width="140" />
+          </el-table>
+          <div v-if="!(store.analysisResult?.limit_up_events?.length)" class="empty-events">该区间内无涨停</div>
+        </el-card>
+        <el-card class="section-card event-table-card">
+          <template #header><span class="section-title">【跌停】</span></template>
+          <el-table :data="store.analysisResult?.limit_down_events ?? []" stripe size="small">
+            <el-table-column prop="dt" label="时间节点" min-width="140" />
+          </el-table>
+          <div v-if="!(store.analysisResult?.limit_down_events?.length)" class="empty-events">该区间内无跌停</div>
+        </el-card>
+        <el-card class="section-card event-table-card">
+          <template #header><span class="section-title">【第一类买点】</span></template>
+          <el-table :data="store.analysisResult?.buy1_events ?? []" stripe size="small">
+            <el-table-column prop="dt" label="时间节点" min-width="140" />
+          </el-table>
+          <div v-if="!(store.analysisResult?.buy1_events?.length)" class="empty-events">该区间内无此类买点</div>
+        </el-card>
+        <el-card class="section-card event-table-card">
+          <template #header><span class="section-title">【第二类买点】</span></template>
+          <el-table :data="store.analysisResult?.buy2_events ?? []" stripe size="small">
+            <el-table-column prop="dt" label="时间节点" min-width="140" />
+          </el-table>
+          <div v-if="!(store.analysisResult?.buy2_events?.length)" class="empty-events">该区间内无此类买点</div>
+        </el-card>
+        <el-card class="section-card event-table-card">
+          <template #header><span class="section-title">【第三类买点】</span></template>
+          <el-table :data="store.analysisResult?.buy3_events ?? []" stripe size="small">
+            <el-table-column prop="dt" label="时间节点" min-width="140" />
+          </el-table>
+          <div v-if="!(store.analysisResult?.buy3_events?.length)" class="empty-events">该区间内无此类买点</div>
+        </el-card>
+        <el-card class="section-card event-table-card">
+          <template #header><span class="section-title">【第一类卖点】</span></template>
+          <el-table :data="store.analysisResult?.sell1_events ?? []" stripe size="small">
+            <el-table-column prop="dt" label="时间节点" min-width="140" />
+          </el-table>
+          <div v-if="!(store.analysisResult?.sell1_events?.length)" class="empty-events">该区间内无此类卖点</div>
+        </el-card>
+        <el-card class="section-card event-table-card">
+          <template #header><span class="section-title">【第二类卖点】</span></template>
+          <el-table :data="store.analysisResult?.sell2_events ?? []" stripe size="small">
+            <el-table-column prop="dt" label="时间节点" min-width="140" />
+          </el-table>
+          <div v-if="!(store.analysisResult?.sell2_events?.length)" class="empty-events">该区间内无此类卖点</div>
+        </el-card>
+        <el-card class="section-card event-table-card">
+          <template #header><span class="section-title">【第三类卖点】</span></template>
+          <el-table :data="store.analysisResult?.sell3_events ?? []" stripe size="small">
+            <el-table-column prop="dt" label="时间节点" min-width="140" />
+          </el-table>
+          <div v-if="!(store.analysisResult?.sell3_events?.length)" class="empty-events">该区间内无此类卖点</div>
+        </el-card>
+      </div>
       <!-- K线图（analyze4 风格 100% 还原） -->
       <el-card class="section-card">
         <template #header><span class="section-title">【K线图】</span></template>
@@ -159,6 +219,8 @@ import {
   ElButton,
   ElDatePicker,
   ElAlert,
+  ElTable,
+  ElTableColumn,
 } from 'element-plus';
 import { useAnalysisStore } from '../stores/analysis';
 import SymbolSelect from '../components/SymbolSelect.vue';
@@ -401,5 +463,14 @@ onMounted(() => {
 .kline-wrapper {
   width: 100%;
   min-height: 500px;
+}
+.event-table-card {
+  min-width: 180px;
+}
+.empty-events {
+  font-size: 12px;
+  color: #909399;
+  padding: 8px 0;
+  text-align: center;
 }
 </style>

@@ -8,6 +8,37 @@ from typing import Dict, Any, List
 from czsc.objects import RawBar, BI, FX, ZS, Signal
 
 
+def _format_dt_by_freq(dt, freq: str) -> str:
+    """根据周期将 dt 格式化为日期或日期+时间。
+
+    :param dt: 时间（datetime 或可 strftime/str 的对象）
+    :param freq: 周期，如 日线、15分钟、30分钟、60分钟、周线、月线
+    :return: 日/周/月为 YYYY-MM-DD，分钟周期为 YYYY-MM-DD HH:mm
+    """
+    if hasattr(dt, "strftime"):
+        if freq in ("日线", "周线", "月线", "日", "周", "月"):
+            return dt.strftime("%Y-%m-%d")
+        return dt.strftime("%Y-%m-%d %H:%M")
+    s = str(dt)
+    if freq in ("日线", "周线", "月线", "日", "周", "月"):
+        return s[:10] if len(s) >= 10 else s
+    if "T" in s:
+        part = s.split("T")
+        t = part[1].replace("Z", "").split(".")[0][:5] if len(part) > 1 else "00:00"
+        return f"{part[0]} {t}"
+    return s[:16] if len(s) >= 16 else s
+
+
+def serialize_event_events(dts: List[Any], freq: str) -> List[Dict[str, Any]]:
+    """将事件 dt 列表序列化为前端可用的字典列表（含按周期格式化的 dt）。
+
+    :param dts: 时间节点列表（datetime 或可格式化的对象）
+    :param freq: 当前分析周期，用于决定 dt 格式
+    :return: [{"dt": "YYYY-MM-DD"}, ...] 或 [{"dt": "YYYY-MM-DD HH:mm"}, ...]
+    """
+    return [{"dt": _format_dt_by_freq(d, freq)} for d in dts]
+
+
 def serialize_raw_bar(bar: RawBar) -> Dict[str, Any]:
     """
     序列化RawBar对象

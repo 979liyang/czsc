@@ -3,6 +3,8 @@
     <div class="chart-toolbar">
       <el-switch v-model="smcEnabled" size="small" active-text="SMC" inactive-text="SMC" />
       <el-switch v-model="czscBsEnabled" size="small" active-text="麒麟买卖点" inactive-text="麒麟买卖点" />
+      <!-- 分析买卖点（一买一卖）：打开后 K 线图通过 analysisBsOverlay.drawBs1Overlay 绘制一买/一卖标记，数据来自 analysis API buy1_events/sell1_events -->
+      <el-switch v-model="showAnalysisBs" size="small" active-text="分析买卖点（一买一卖）" inactive-text="分析买卖点（一买一卖）" />
       <div v-if="czscBsEnabled" class="czsc-toolbar">
         <el-select v-model="czscMode" size="small" style="width: 100px" title="麒麟模式">
           <el-option label="ZSLX 递归" value="zslx" />
@@ -73,10 +75,12 @@ const emit = defineEmits<{
   (e: 'update:czscMode', v: 'simple' | 'zslx'): void;
   (e: 'update:czscMinKlinesPerPen', v: number): void;
   (e: 'update:czscPenType', v: 'old' | 'new' | 'fractal'): void;
+  (e: 'update:showAnalysisBs', v: boolean): void;
   (e: 'run-pine-ts'): void;
 }>();
 
 const smcEnabled = defineModel<boolean>('smcEnabled', { default: false });
+const showAnalysisBs = defineModel<boolean>('showAnalysisBs', { default: false });
 const czscBsEnabled = defineModel<boolean>('czscBsEnabled', { default: false });
 const czscMode = defineModel<'simple' | 'zslx'>('czscMode', { default: 'zslx' });
 const czscMinKlinesPerPen = defineModel<number>('czscMinKlinesPerPen', { default: 5 });

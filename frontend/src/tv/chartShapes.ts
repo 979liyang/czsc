@@ -531,17 +531,27 @@ async function drawHorizontalRay(
     const sign = vertical === 'above' ? 1 : -1;
     const priceOffset = sign * Math.abs(linePrice * offsetPercent);
     const labelPoint: ChartPoint = { time: labelTime, price: linePrice + priceOffset };
+    const labelColor = toColor(shape.label.color, '#2962FF');
     const textOverrides = buildTextLineToolOverrides({
-      color: shape.label.color,
+      color: labelColor,
       fontsize: shape.label.fontSize,
       bold: shape.label.bold,
     });
+    const overrides: Record<string, unknown> = { ...textOverrides, color: labelColor };
     const idText = await chart.createShape(labelPoint, {
       shape: 'text',
       ...LOCK_OPTS,
       text: shape.label.text,
-      overrides: textOverrides,
+      overrides,
     });
+    try {
+      const entity = chart.getShapeById(idText);
+      if (entity?.setProperties) {
+        entity.setProperties(overrides);
+      }
+    } catch {
+      // 忽略
+    }
     ids.push(idText);
   }
   return ids;

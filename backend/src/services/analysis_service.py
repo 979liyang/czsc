@@ -11,7 +11,7 @@ from czsc.analyze import CZSC
 from czsc.objects import RawBar
 
 from ..utils import CZSCAdapter
-from ..models.serializers import serialize_bis, serialize_fxs, serialize_zss
+from ..models.serializers import serialize_bis, serialize_fxs, serialize_zss, serialize_event_events
 
 
 def _date_str(dt) -> str:
@@ -104,6 +104,24 @@ class AnalysisService:
         else:
             result['last_bi_direction'] = None
             result['last_bi_power'] = None
+
+        # 涨停、跌停与一二三类买卖点时间节点（按周期格式化 dt）
+        try:
+            event_dts = czsc.get_event_dts()
+            freq_val = czsc.freq.value
+            result['limit_up_events'] = serialize_event_events(event_dts.get('limit_up_dts', []), freq_val)
+            result['limit_down_events'] = serialize_event_events(event_dts.get('limit_down_dts', []), freq_val)
+            result['buy1_events'] = serialize_event_events(event_dts.get('buy1_dts', []), freq_val)
+            result['buy2_events'] = serialize_event_events(event_dts.get('buy2_dts', []), freq_val)
+            result['buy3_events'] = serialize_event_events(event_dts.get('buy3_dts', []), freq_val)
+            result['sell1_events'] = serialize_event_events(event_dts.get('sell1_dts', []), freq_val)
+            result['sell2_events'] = serialize_event_events(event_dts.get('sell2_dts', []), freq_val)
+            result['sell3_events'] = serialize_event_events(event_dts.get('sell3_dts', []), freq_val)
+        except Exception as e:
+            logger.warning(f"缠论事件时间节点计算失败，返回空列表：{e}")
+            for key in ('limit_up_events', 'limit_down_events', 'buy1_events', 'buy2_events',
+                        'buy3_events', 'sell1_events', 'sell2_events', 'sell3_events'):
+                result[key] = []
 
         logger.info(f"缠论分析完成：{symbol} {freq}，笔{len(result['bis'])}条，"
                    f"分型{len(result['fxs'])}个，中枢{len(result['zss'])}个")

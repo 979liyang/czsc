@@ -8,7 +8,7 @@ describe: 缠论分型、笔的识别
 import os
 import webbrowser
 from loguru import logger
-from typing import List
+from typing import List, Tuple, Dict, Any
 from collections import OrderedDict
 from czsc.enum import Mark, Direction
 from czsc.objects import BI, FX, RawBar, NewBar
@@ -189,6 +189,102 @@ def check_bi(bars: List[NewBar], **kwargs):
         return bi, bars_b
     else:
         return None, bars
+
+
+def _collect_limit_zdt_events(bars_raw: List[RawBar]) -> Tuple[List[Any], List[Any]]:
+    """扫描 bars_raw 收集涨停、跌停的 K 线 dt（与 bar_zdt_V230331 逻辑一致）。
+
+    :param bars_raw: 原始K线序列
+    :return: (涨停dt列表, 跌停dt列表)
+    """
+    limit_up_dts: List[Any] = []
+    limit_down_dts: List[Any] = []
+    if len(bars_raw) < 2:
+        return limit_up_dts, limit_down_dts
+    for i in range(1, len(bars_raw)):
+        b1, b2 = bars_raw[i], bars_raw[i - 1]
+        if b1.close == b1.high and b1.high >= b2.close:
+            limit_up_dts.append(b1.dt)
+        elif b1.close == b1.low and b1.low <= b2.close:
+            limit_down_dts.append(b1.dt)
+    return limit_up_dts, limit_down_dts
+
+
+def _collect_bs_events(bars_raw: List[RawBar], czsc_class) -> Dict[str, List[Any]]:
+    """回放 K 线，在每根 K 线处计算一二三类买卖点信号，收集触发的 dt。
+
+    注意：信号函数返回 OrderedDict，key 为信号 key，value 为 "v1_v2_v3_score" 字符串，
+    需解析 value 的第一段得到 v1，不能使用 .get("v1")。
+
+    第一类买卖点：除 BS1 信号外，用已完成笔的端点作为结构备选——向下笔的底分型端点(fx_b)视为一买、
+    向上笔的顶分型端点(fx_b)视为一卖，与 BS1 结果合并去重，避免表格长期为空。
+
+    :param bars_raw: 原始K线序列
+    :param czsc_class: CZSC 类（避免循环导入，由调用方传入）
+    :return: 含 buy1_dts, sell1_dts, buy2_dts, sell2_dts, buy3_dts, sell3_dts 的字典
+    """
+    from czsc.signals.zdy import zdy_macd_bs1_V230422
+    from czsc.signals.cxt import cxt_second_bs_V230320, cxt_third_bs_V230319
+
+    def _v1_from_signal(sig) -> str:
+        """从信号返回值中解析 v1。create_single_signal 返回 OrderedDict，value 为 v1_v2_v3_score。"""
+        if not sig or not isinstance(sig, dict):
+            return "其他"
+        val = next(iter(sig.values()), None)
+        if not isinstance(val, str):
+            return "其他"
+        return val.split("_")[0] if val else "其他"
+
+    result = {
+        "buy1_dts": [],
+        "sell1_dts": [],
+        "buy2_dts": [],
+        "sell2_dts": [],
+        "buy3_dts": [],
+        "sell3_dts": [],
+    }
+    if len(bars_raw) < 2:
+        return result
+    c = czsc_class(bars_raw[:1])
+    for i in range(1, len(bars_raw)):
+        c.update(bars_raw[i])
+        dt = bars_raw[i].dt
+        s1 = zdy_macd_bs1_V230422(c)
+        s2 = cxt_second_bs_V230320(c)
+        s3 = cxt_third_bs_V230319(c)
+        v1_s1 = _v1_from_signal(s1)
+        v1_s2 = _v1_from_signal(s2)
+        v1_s3 = _v1_from_signal(s3)
+        if v1_s1 == "看多":
+            result["buy1_dts"].append(dt)
+        if v1_s1 == "看空":
+            result["sell1_dts"].append(dt)
+        if v1_s2 == "二买":
+            result["buy2_dts"].append(dt)
+        if v1_s2 == "二卖":
+            result["sell2_dts"].append(dt)
+        if v1_s3 == "三买":
+            result["buy3_dts"].append(dt)
+        if v1_s3 == "三卖":
+            result["sell3_dts"].append(dt)
+
+    # 第一类买卖点结构备选：已完成笔的端点——向下笔底分型端点=一买候选，向上笔顶分型端点=一卖候选
+    seen_buy1 = {t for t in result["buy1_dts"]}
+    seen_sell1 = {t for t in result["sell1_dts"]}
+    for bi in c.finished_bis:
+        if bi.direction == Direction.Down and bi.fx_b.mark == Mark.D:
+            t = bi.fx_b.dt
+            if t not in seen_buy1:
+                seen_buy1.add(t)
+                result["buy1_dts"].append(t)
+        elif bi.direction == Direction.Up and bi.fx_b.mark == Mark.G:
+            t = bi.fx_b.dt
+            if t not in seen_sell1:
+                seen_sell1.add(t)
+                result["sell1_dts"].append(t)
+    result["buy1_dts"] = sorted(result["buy1_dts"], key=lambda x: x)
+    result["sell1_dts"] = sorted(result["sell1_dts"], key=lambda x: x)
+    return result
 
 
 class CZSC:
@@ -477,3 +573,25 @@ class CZSC:
             if not fxs or x.dt > fxs[-1].dt:
                 fxs.append(x)
         return fxs
+
+    def get_event_dts(self) -> Dict[str, List[Any]]:
+        """获取八类事件的时间节点列表：涨停、跌停、一二三类买卖点。
+
+        涨停/跌停与 bar_zdt_V230331 逻辑一致；买卖点通过回放 K 线调用
+        zdy_macd_bs1_V230422、cxt_second_bs_V230320、cxt_third_bs_V230319 收集。
+
+        :return: 含 limit_up_dts, limit_down_dts, buy1_dts, sell1_dts,
+                 buy2_dts, sell2_dts, buy3_dts, sell3_dts 的字典，值为 dt 列表
+        """
+        limit_up_dts, limit_down_dts = _collect_limit_zdt_events(self.bars_raw)
+        bs = _collect_bs_events(self.bars_raw, CZSC)
+        return {
+            "limit_up_dts": limit_up_dts,
+            "limit_down_dts": limit_down_dts,
+            "buy1_dts": bs["buy1_dts"],
+            "sell1_dts": bs["sell1_dts"],
+            "buy2_dts": bs["buy2_dts"],
+            "sell2_dts": bs["sell2_dts"],
+            "buy3_dts": bs["buy3_dts"],
+            "sell3_dts": bs["sell3_dts"],
+        }

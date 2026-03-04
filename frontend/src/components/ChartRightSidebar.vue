@@ -47,6 +47,7 @@
       <div class="widgetbar-page tools-page">
         <ChartRightTools
           v-model:smc-enabled="smcEnabled"
+          v-model:show-analysis-bs="showAnalysisBs"
           v-model:smc-show-fvg="smcShowFvg"
           v-model:smc-show-zones="smcShowZones"
           v-model:smc-show-swing-ob="smcShowSwingOb"
@@ -132,6 +133,7 @@ const czscBsEnabled = defineModel<boolean>('czscBsEnabled', { default: false });
 const czscMode = defineModel<'simple' | 'zslx'>('czscMode', { default: 'zslx' });
 const czscMinKlinesPerPen = defineModel<number>('czscMinKlinesPerPen', { default: 5 });
 const czscPenType = defineModel<'old' | 'new' | 'fractal'>('czscPenType', { default: 'new' });
+const showAnalysisBs = defineModel<boolean>('showAnalysisBs', { default: false });
 
 /** 自选面板是否展开；点击自选 tab 展开，再次点击收起 */
 const watchlistPanelVisible = ref(false);
